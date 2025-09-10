@@ -2,6 +2,8 @@
 import express from "express";
 import dotenv from "dotenv";
 
+import { createClient } from '@supabase/supabase-js';
+
 // Import routes
 import usersRoute from "./routes/users.js";
 import simsRoute from "./routes/sims.js";
@@ -19,6 +21,12 @@ const app = express();
 
 // PORT value fallback to 4000
 const PORT = process.env.PORT || 4000;
+
+// Read from environment
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(express.json());
 

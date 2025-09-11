@@ -1,42 +1,74 @@
+// routes/assign.js
 import express from 'express';
-import pool from '../db/db.js'; // import the pool
+import pool from '../db/db.js';
 
 const router = express.Router();
 
-// POST /assign → assign a SIM to a user
+// ✅ Get all SIM assignments with user name and SIM phone
+router.get('/', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT a.assignment_id, u.name AS user_name, s.phone_number AS sim_phone, a.user_id, a.sim_id
+      FROM sim_assignment a
+      JOIN users1 u ON a.user_id = u.user_id
+      JOIN sim_inventory s ON a.sim_id = s.sim_id
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("Fetch assignments error:", err);
+    res.status(500).send("Server Error");
+  }
+});
+
+// ✅ Assign a SIM to a user
 router.post('/', async (req, res) => {
+  const { user_id, sim_id } = req.body;
 
-  const { user_id, old_sim_id, new_sim_id, admin } = req.body;
+  // 🔒 Validations
+  if (!user_id || !sim_id) {
+    return res.status(400).json({ error: "Missing required fields: user_id and sim_id are required" });
+  }
 
-  const logSwapQuery = `
-    INSERT INTO swap_log (old_sim_id, new_sim_id, user_id, done_by_admin)
-    VALUES ($1, $2, $3, $4)
-    RETURNING *;
-  `;
-
-  const deactivateOldQuery = `
-    UPDATE sim_assignment
-    SET active = FALSE, unassigned_at = NOW()
-    WHERE user_id = $1 AND sim_id = $2;
-  `;
-
-  const assignNewQuery = `
+  const assignQuery = `
     INSERT INTO sim_assignment (user_id, sim_id)
-    VALUES ($1, $2)
-    RETURNING *;
+    VALUES (?, ?)
+  `;
+  const updateSimStatusQuery = `
+    UPDATE sim_inventory SET status = 'assigned' WHERE sim_id = ?
   `;
 
   try {
-    await pool.query("BEGIN");
-    await pool.query(deactivateOldQuery, [user_id, old_sim_id]);
-    const newAssign = await pool.query(assignNewQuery, [user_id, new_sim_id]);
-    const swapLog = await pool.query(logSwapQuery, [old_sim_id, new_sim_id, user_id, admin]);
-    await pool.query("COMMIT");
-    res.json({ newAssign: newAssign.rows[0], swapLog: swapLog.rows[0] });
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Insert assignment
+      const [assignResult] = await connection.query(assignQuery, [user_id, sim_id]);
+
+      // Update SIM status
+      await connection.query(updateSimStatusQuery, [sim_id]);
+
+      // Fetch inserted row with JOIN to get user name and sim phone
+      const [rows] = await connection.query(`
+        SELECT a.assignment_id, u.name AS user_name, s.phone_number AS sim_phone, a.user_id, a.sim_id
+        FROM sim_assignment a
+        JOIN users1 u ON a.user_id = u.user_id
+        JOIN sim_inventory s ON a.sim_id = s.sim_id
+        WHERE a.assignment_id = ?
+      `, [assignResult.insertId]);
+
+      await connection.commit();
+      res.status(201).json(rows[0]);
+    } catch (err) {
+      await connection.rollback();
+      console.error("Assign SIM error:", err);
+      res.status(500).send("Error assigning SIM");
+    } finally {
+      connection.release();
+    }
   } catch (err) {
-    await pool.query("ROLLBACK");
-    console.error(err);
-    res.status(500).send("Error swapping SIM");
+    console.error("DB connection error:", err);
+    res.status(500).send("Database error");
   }
 });
 

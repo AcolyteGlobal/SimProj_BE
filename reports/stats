@@ -1,10 +1,28 @@
 import express from 'express';
 import pool from '../db/db.js';
 
+import supabase from "../supabaseClient.js";
+
 const router = express.Router();
 
 router.get('/', async (req, res) => {
 
+  const query = `
+    SELECT
+      (SELECT COUNT(*) FROM users WHERE status = 'active') AS active_users,
+      (SELECT COUNT(*) FROM users WHERE status = 'inactive') AS inactive_users,
+      (SELECT COUNT(*) FROM sim_inventory WHERE status = 'available') AS sims_available,
+      (SELECT COUNT(*) FROM sim_inventory WHERE status = 'assigned') AS sims_assigned,
+      (SELECT COUNT(*) FROM sim_inventory WHERE status = 'inactive' OR status = 'out_of_service') AS sims_removed;
+  `;
+  try {
+    const result = await supabase.query(query);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error fetching stats");
+  }
+});
 
 
 

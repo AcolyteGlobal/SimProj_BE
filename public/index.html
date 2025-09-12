@@ -7,6 +7,79 @@
 </head>
 <body class="bg-gray-50 p-6">
 
+  <!--eeeeeeeeeeeEEEEEEEEEEEEEEEEEEEE-->
+
+
+  <!-- SIMS SECTION -->
+  <div class="w-full max-w-7xl mx-auto p-4 mt-10">
+    <h1 class="text-2xl font-bold mb-4 text-gray-800">Sims List</h1>
+
+    <!-- Button to fetch Sims -->
+    <button id="fetchSimsBtn"
+      class="mb-4 px-6 py-2 bg-blue-600 text-white rounded-xl shadow hover:bg-blue-700">
+      Get Sims Data
+    </button>
+
+    <!-- Sims Table -->
+    <div class="overflow-x-auto rounded-lg shadow-lg hidden" id="simsTableContainer">
+      <table id="simsTable" class="w-full text-sm text-left text-gray-600">
+        <thead class="bg-gray-800 text-white">
+          <tr>
+            <th class="px-4 py-3">SIM ID</th>
+            <th class="px-4 py-3">Phone Number</th>
+            <!-- <th class="px-4 py-3">Provider</th> -->
+            <th class="px-4 py-3">Status</th>
+            <th class="px-4 py-3">Assigned User</th>
+            <th class="px-4 py-3">Added Date</th>
+        <th class="px-4 py-3">Updated At</th>
+          </tr>
+        </thead>
+        <tbody id="simsBody" class="bg-white divide-y divide-gray-200">
+          <!-- Dynamic Rows -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // Fetch Sims Data on Button Click
+    document.getElementById("fetchSimsBtn").addEventListener("click", async () => {
+      try {
+        const res = await fetch("http://localhost:4000/sims");
+        const sims = await res.json();
+
+        const simsBody = document.getElementById("simsBody");
+        simsBody.innerHTML = ""; // Clear old rows
+
+        sims.forEach(sim => {
+          const row = `
+            <tr>
+              <td class="px-4 py-3">${sim.sim_id}</td>
+              <td class="px-4 py-3">${sim.phone_number}</td>
+              
+              <td class="px-4 py-3">
+                <span class="px-2 py-1 text-xs font-semibold rounded-full ${sim.status === "active" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}">
+                  ${sim.status}
+                </span>
+              </td>
+              <td class="px-4 py-3">${sim.assigned_user || "-"}</td>
+      <td class="px-4 py-3">${sim.added_date ? new Date(sim.added_date).toLocaleString() : "-"}</td>
+      <td class="px-4 py-3">${sim.updated_at ? new Date(sim.updated_at).toLocaleString() : "-"}</td>
+    </tr>
+          `;
+          simsBody.insertAdjacentHTML("beforeend", row);
+        });
+
+        document.getElementById("simsTableContainer").classList.remove("hidden");
+      } catch (error) {
+        console.error("Error fetching sims:", error);
+      }
+    });
+  </script>
+
+    <!--eeeeeeeeeeeEEEEEEEEEEEEEEEEEEEE-->
+
+    
   <div class="max-w-7xl mx-auto">
     <h1 class="text-3xl font-bold mb-6 text-gray-800">Local API Tester</h1>
 

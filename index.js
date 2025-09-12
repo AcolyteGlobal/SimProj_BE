@@ -11,6 +11,8 @@ import swapRoute from "./routes/swap.js";
 import exitRoute from "./routes/exit.js";
 import allUsers from "./routes/allUsers.js";
 import activeUsers from "./reports/activeUsers.js";
+import toggleActive from "./routes/toggleActive.js";
+
 
 dotenv.config();
 
@@ -33,6 +35,7 @@ app.use("/swap", swapRoute);
 app.use("/exit", exitRoute);    
 app.use("/allUsers", allUsers); 
 app.use("/activeUsers", activeUsers);
+app.use("toggleActive", toggleActive);
 
 // Serve index.html at root
 app.get('/', (req, res) => {

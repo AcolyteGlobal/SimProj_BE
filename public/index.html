@@ -7,16 +7,272 @@
 </head>
 <body class="bg-gray-50 p-6">
 
+
+  <!---->
+    
+  <div class="max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6 text-gray-800">Acolyte Admin page for Employees</h1>
+
+
+  
+<!-- SEARCH -->
+<div class="mb-4">
+  <label class="block mb-2 font-semibold text-gray-700">Search Users by Name:</label>
+  <input
+    type="text"
+    id="searchInput"
+    placeholder="Type name and press Enter"
+    class="p-2 border rounded w-1/3"
+    onkeypress="if(event.key==='Enter'){ searchUsers() }"
+  >
+  <button onclick="searchUsers()" class="ml-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+</div>
+
+<!-- Users Table -->
+<div class="overflow-x-auto rounded-lg shadow-lg bg-white">
+  <table class="w-full text-sm text-left text-gray-600">
+    <thead class="bg-gray-800 text-white">
+      <tr>
+        <th class="px-4 py-3">ID</th>
+        <th class="px-4 py-3">Name</th>
+        <th class="px-4 py-3">Branch</th>
+        <th class="px-4 py-3">Office</th>
+        <th class="px-4 py-3">Department</th>
+        <th class="px-4 py-3">Biometric ID</th>
+        <th class="px-4 py-3">Email</th>
+        <th class="px-4 py-3">Phone</th> <!-- NEW -->
+        <th class="px-4 py-3">Status</th>
+        <th class="px-4 py-3">Created</th>
+        <th class="px-4 py-3">Updated</th>
+      </tr>
+    </thead>
+    <tbody id="usersTableBody" class="bg-white divide-y divide-gray-200">
+      <!-- Rows inserted dynamically -->
+    </tbody>
+  </table>
+</div>
+
+<script>
+  let allUsersData = [];
+
+  // Fetch all users from backend
+  async function fetchUsers() {
+    const res = await fetch('/users'); // your /users route with phone_number join
+    const data = await res.json();
+    allUsersData = data; // store for searching
+    populateTable(data);
+  }
+
+  // Search function
+  function searchUsers() {
+    const query = document.getElementById('searchInput').value.trim().toLowerCase();
+    if (!query) {
+      populateTable(allUsersData); // reset to all
+      return;
+    }
+    const filtered = allUsersData.filter(user => user.name?.toLowerCase().includes(query));
+    populateTable(filtered);
+  }
+
+  // Populate table rows
+  function populateTable(users) {
+    const tableBody = document.getElementById('usersTableBody');
+    tableBody.innerHTML = '';
+    users.forEach(user => {
+      tableBody.innerHTML += `
+        <tr>
+          <td class="px-4 py-3">${user.user_id || '-'}</td>
+          <td class="px-4 py-3 font-medium text-gray-900">${user.name || '-'}</td>
+          <td class="px-4 py-3">${user.branch || '-'}</td>
+          <td class="px-4 py-3">${user.office_number || '-'}</td>
+          <td class="px-4 py-3">${user.department || '-'}</td>
+          <td class="px-4 py-3">${user.biometric_id || '-'}</td>
+          <td class="px-4 py-3">${user.official_email || '-'}</td>
+          <td class="px-4 py-3">${user.phone_number || '-'}</td> <!-- NEW -->
+          <td class="px-4 py-3">
+            <span class="px-2 py-1 text-xs font-semibold rounded-full 
+              ${user.status === 'inactive' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}">
+              ${user.status || 'Active'}
+            </span>
+          </td>
+          <td class="px-4 py-3">${user.created_at?.split('T')[0] || '-'}</td>
+          <td class="px-4 py-3">${user.updated_at?.split('T')[0] || '-'}</td>
+        </tr>
+      `;
+    });
+  }
+
+  // Initial load
+  fetchUsers();
+</script>
+
+
+<!--SEARCH ENDS-->
+
+
+
   <!--eeeeeeeeeeeEEEEEEEEEEEEEEEEEEEE-->
+<div id="userTableContainer" class="overflow-x-auto max-w-7xl mx-auto">
+  <table class="w-full text-sm text-left text-gray-600" id="userTable">
+    <thead class="bg-gray-800 text-white">
+      <tr>
+        <th class="px-4 py-2">User ID</th>
+        <th class="px-4 py-2">Name</th>
+        <th class="px-4 py-2">Status</th>
+        <th class="px-4 py-2">Action</th>
+      </tr>
+    </thead>
+    <tbody id="userTableBody">
+      <!-- Dynamic rows go here -->
+    </tbody>
+  </table>
+</div>
+
+<script>
+async function fetchUsers() {
+  const res = await fetch("http://localhost:4000/activeUsers");
+  const users = await res.json();
+  const tbody = document.getElementById("userTableBody");
+  tbody.innerHTML = "";
+
+  users.forEach(u => {
+    const row = document.createElement("tr");
+
+    // Status text
+    const statusText = u.status === "active" || u.status === 1 ? "Active" : "Inactive";
+
+    row.innerHTML = `
+      <td class="px-4 py-2">${u.user_id}</td>
+      <td class="px-4 py-2">${u.name}</td>
+      <td class="px-4 py-2" id="status-${u.user_id}">${statusText}</td>
+      <td class="px-4 py-2">
+        <button 
+          class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+          onclick="toggleStatus(${u.user_id}, ${u.status === "active" || u.status === 1 ? 0 : 1})"
+        >
+          ${u.status === "active" || u.status === 1 ? "Deactivate" : "Activate"}
+        </button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+// Toggle active status
+async function toggleStatus(user_id, newStatus) {
+  try {
+    const res = await fetch("http://localhost:4000/toggleActive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id, status: newStatus })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      // Update status text & button label
+      document.getElementById(`status-${user_id}`).textContent = newStatus ? "Active" : "Inactive";
+      fetchUsers(); // refresh table for button labels
+    } else {
+      alert("Failed to update status");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error updating status");
+  }
+}
+
+// Initial fetch
+fetchUsers();
+</script>
+
+  
+    <!--eeeeeeeeeeeEEEEEEEEEEEEEEEEEEEE-->
+
+ 
 
 
-  <!-- SIMS SECTION -->
-  <div class="w-full max-w-7xl mx-auto p-4 mt-10">
-    <h1 class="text-2xl font-bold mb-4 text-gray-800">Sims List</h1>
+<!-- ACTIVE USERS SECTION -->
+<div class="w-full max-w-7xl mx-auto p-4">
+  <h1 class="text-2xl font-bold mb-4 text-gray-800">Active Users</h1>
+
+  <!-- Button to fetch Active Users -->
+  <button id="fetchActiveUsersBtn"
+    class="mb-4 px-6 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700">
+    Get Active Users
+  </button>
+
+  <!-- Active Users Table -->
+  <div class="overflow-x-auto rounded-lg shadow-lg hidden" id="activeUsersTableContainer">
+    <table id="activeUsersTable" class="w-full text-sm text-left text-gray-600">
+      <thead class="bg-gray-800 text-white">
+        <tr>
+          <th class="px-4 py-3">User ID</th>
+          <th class="px-4 py-3">Name</th>
+          <th class="px-4 py-3">Branch</th>
+          <th class="px-4 py-3">Department</th>
+          <th class="px-4 py-3">Office No</th>
+          <th class="px-4 py-3">Email</th>
+          <th class="px-4 py-3">Biometric ID</th>
+          <th class="px-4 py-3">Phone Number</th>
+          <th class="px-4 py-3">Assigned At</th>
+        </tr>
+      </thead>
+      <tbody id="activeUsersBody" class="bg-white divide-y divide-gray-200">
+        <!-- Dynamic Rows -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  // Fetch Active Users on Button Click
+  document.getElementById("fetchActiveUsersBtn").addEventListener("click", async () => {
+    try {
+      const res = await fetch("http://localhost:4000/activeUsers"); // your API route
+      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+
+      const users = await res.json();
+
+      const tableBody = document.getElementById("activeUsersBody");
+      tableBody.innerHTML = ""; // Clear old rows
+
+      // Populate table
+      users.forEach(u => {
+        const assignedDate = u.assigned_at ? new Date(u.assigned_at).toLocaleString() : "-";
+        const phone = u.phone_number || "-";
+
+        const row = `
+          <tr>
+            <td class="px-4 py-3">${u.user_id}</td>
+            <td class="px-4 py-3">${u.name}</td>
+            <td class="px-4 py-3">${u.branch}</td>
+            <td class="px-4 py-3">${u.department}</td>
+            <td class="px-4 py-3">${u.office_number}</td>
+            <td class="px-4 py-3">${u.official_email}</td>
+            <td class="px-4 py-3">${u.biometric_id}</td>
+            <td class="px-4 py-3">${phone}</td>
+            <td class="px-4 py-3">${assignedDate}</td>
+          </tr>
+        `;
+        tableBody.insertAdjacentHTML("beforeend", row);
+      });
+
+      // Show table container
+      document.getElementById("activeUsersTableContainer").classList.remove("hidden");
+    } catch (error) {
+      console.error("Error fetching active users:", error);
+      alert("Failed to fetch active users. Check console for details.");
+    }
+  });
+</script>
+    
+   <!-- SIMS SECTION -->
+  <div class="w-full max-w-7xl mx-auto p-4">
+    <h1 class="text-xl font-semibold mb-2">Sims List</h1>
 
     <!-- Button to fetch Sims -->
     <button id="fetchSimsBtn"
-      class="mb-4 px-6 py-2 bg-blue-600 text-white rounded-xl shadow hover:bg-blue-700">
+      class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2">
       Get Sims Data
     </button>
 
@@ -27,11 +283,11 @@
           <tr>
             <th class="px-4 py-3">SIM ID</th>
             <th class="px-4 py-3">Phone Number</th>
-            <!-- <th class="px-4 py-3">Provider</th> -->
+            <th class="px-4 py-3">Provider</th>
             <th class="px-4 py-3">Status</th>
             <th class="px-4 py-3">Assigned User</th>
             <th class="px-4 py-3">Added Date</th>
-        <th class="px-4 py-3">Updated At</th>
+            <th class="px-4 py-3">Updated Date</th>
           </tr>
         </thead>
         <tbody id="simsBody" class="bg-white divide-y divide-gray-200">
@@ -56,16 +312,19 @@
             <tr>
               <td class="px-4 py-3">${sim.sim_id}</td>
               <td class="px-4 py-3">${sim.phone_number}</td>
-              
+              <td class="px-4 py-3">${sim.provider}</td>
               <td class="px-4 py-3">
-                <span class="px-2 py-1 text-xs font-semibold rounded-full ${sim.status === "active" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}">
+                <span class="px-2 py-1 text-xs font-semibold rounded-full 
+                  ${sim.status === "assigned" || sim.status === "active" 
+                    ? "bg-green-100 text-green-600" 
+                    : "bg-yellow-100 text-yellow-600"}">
                   ${sim.status}
                 </span>
               </td>
               <td class="px-4 py-3">${sim.assigned_user || "-"}</td>
-      <td class="px-4 py-3">${sim.added_date ? new Date(sim.added_date).toLocaleString() : "-"}</td>
-      <td class="px-4 py-3">${sim.updated_at ? new Date(sim.updated_at).toLocaleString() : "-"}</td>
-    </tr>
+              <td class="px-4 py-3">${new Date(sim.added_date).toLocaleString()}</td>
+              <td class="px-4 py-3">${new Date(sim.updated_at).toLocaleString()}</td>
+            </tr>
           `;
           simsBody.insertAdjacentHTML("beforeend", row);
         });
@@ -77,18 +336,8 @@
     });
   </script>
 
-    <!--eeeeeeeeeeeEEEEEEEEEEEEEEEEEEEE-->
 
-    
-  <div class="max-w-7xl mx-auto">
-    <h1 class="text-3xl font-bold mb-6 text-gray-800">Local API Tester</h1>
 
-    <!-- GET Routes -->
-    <div class="mb-6">
-      <h2 class="text-xl font-semibold mb-2">GET Routes</h2>
-      <button onclick="fetchUsers()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2">Get Users</button>
-      <button onclick="fetchAllUsers()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Get All Users</button>
-    </div>
 
     <!-- POST /users -->
     <div class="mb-6 p-4 bg-white rounded shadow">
@@ -121,44 +370,26 @@
       <button onclick="exitUser()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Exit User</button>
     </div>
 
-    <!-- Users Table -->
-    <div class="overflow-x-auto rounded-lg shadow-lg bg-white">
-      <table class="w-full text-sm text-left text-gray-600">
-        <thead class="bg-gray-800 text-white">
-          <tr>
-            <th class="px-4 py-3">ID</th>
-            <th class="px-4 py-3">Name</th>
-            <th class="px-4 py-3">Branch</th>
-            <th class="px-4 py-3">Office</th>
-            <th class="px-4 py-3">Department</th>
-            <th class="px-4 py-3">Biometric ID</th>
-            <th class="px-4 py-3">Email</th>
-            <th class="px-4 py-3">Status</th>
-            <th class="px-4 py-3">Created</th>
-            <th class="px-4 py-3">Updated</th>
-          </tr>
-        </thead>
-        <tbody id="usersTableBody" class="bg-white divide-y divide-gray-200">
-          <!-- Dynamic rows will appear here -->
-        </tbody>
-      </table>
-    </div>
-  </div>
+
+
+
+
+        <!-- GET Routes
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold mb-2">GET All users (active / inactive)</h2>
+      <button onclick="fetchUsers()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2">Get Users</button>
+     
+    </div> -->
+    
+<!--SEARCH-->
+ 
+
+
 
   <script>
     const tableBody = document.getElementById('usersTableBody');
 
-    async function fetchUsers() {
-      const res = await fetch('/users');
-      const data = await res.json();
-      populateTable(data);
-    }
-
-    async function fetchAllUsers() {
-      const res = await fetch('/allUsers');
-      const data = await res.json();
-      populateTable(data);
-    }
+   
 
     async function createUser() {
       const name = document.getElementById('userName').value.trim();
@@ -213,29 +444,29 @@
       alert(JSON.stringify(data));
     }
 
-    function populateTable(users) {
-      tableBody.innerHTML = '';
-      users.forEach(user => {
-        tableBody.innerHTML += `
-          <tr>
-            <td class="px-4 py-3">${user.user_id || user.id || '-'}</td>
-            <td class="px-4 py-3 font-medium text-gray-900">${user.name || '-'}</td>
-            <td class="px-4 py-3">${user.branch || '-'}</td>
-            <td class="px-4 py-3">${user.office_number || '-'}</td>
-            <td class="px-4 py-3">${user.department || '-'}</td>
-            <td class="px-4 py-3">${user.biometric_id || '-'}</td>
-            <td class="px-4 py-3">${user.official_email || '-'}</td>
-            <td class="px-4 py-3">
-              <span class="px-2 py-1 text-xs font-semibold rounded-full ${user.status === 'inactive' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}">
-                ${user.status || 'Active'}
-              </span>
-            </td>
-            <td class="px-4 py-3">${user.created_at?.split('T')[0] || '-'}</td>
-            <td class="px-4 py-3">${user.updated_at?.split('T')[0] || '-'}</td>
-          </tr>
-        `;
-      });
-    }
+    // function populateTable(users) {
+    //   tableBody.innerHTML = '';
+    //   users.forEach(user => {
+    //     tableBody.innerHTML += `
+    //       <tr>
+    //         <td class="px-4 py-3">${user.user_id || user.id || '-'}</td>
+    //         <td class="px-4 py-3 font-medium text-gray-900">${user.name || '-'}</td>
+    //         <td class="px-4 py-3">${user.branch || '-'}</td>
+    //         <td class="px-4 py-3">${user.office_number || '-'}</td>
+    //         <td class="px-4 py-3">${user.department || '-'}</td>
+    //         <td class="px-4 py-3">${user.biometric_id || '-'}</td>
+    //         <td class="px-4 py-3">${user.official_email || '-'}</td>
+    //         <td class="px-4 py-3">
+    //           <span class="px-2 py-1 text-xs font-semibold rounded-full ${user.status === 'inactive' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}">
+    //             ${user.status || 'Active'}
+    //           </span>
+    //         </td>
+    //         <td class="px-4 py-3">${user.created_at?.split('T')[0] || '-'}</td>
+    //         <td class="px-4 py-3">${user.updated_at?.split('T')[0] || '-'}</td>
+    //       </tr>
+    //     `;
+    //   });
+    // }
   </script>
 </body>
 </html>

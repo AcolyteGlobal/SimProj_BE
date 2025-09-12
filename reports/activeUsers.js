@@ -17,11 +17,16 @@ router.get("/", async (req, res) => {
       sa.assigned_at
     FROM users1 u
     LEFT JOIN sim_assignment sa 
-      ON u.user_id = sa.user_id AND sa.active = 1   -- only active assignments
+      ON u.user_id = sa.user_id
+      AND sa.active = 1
+      AND sa.assigned_at = (
+        SELECT MAX(sa2.assigned_at)
+        FROM sim_assignment sa2
+        WHERE sa2.user_id = u.user_id AND sa2.active = 1
+      )
     LEFT JOIN sim_inventory s 
       ON sa.sim_id = s.sim_id
-    WHERE u.status = 'active'
-    ;
+    WHERE u.status = 'active';
   `;
 
   try {

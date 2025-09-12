@@ -1,4 +1,5 @@
-// routes/assign.js
+
+
 import express from 'express';
 import pool from '../db/db.js'; // MySQL pool
 
@@ -30,7 +31,7 @@ router.get("/", async (req, res) => {
 
         si.phone_number,
 
-        
+        si.provider, 
 
         si.status AS sim_status,
 
@@ -68,7 +69,7 @@ router.get("/", async (req, res) => {
 
       phone_number: r.phone_number,
 
-      // provider: r.provider || null,
+      provider: r.provider || null,
 
       // if user assigned, show "assigned", otherwise keep DB status
 

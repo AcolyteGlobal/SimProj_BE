@@ -118,7 +118,7 @@ function renderDashboard() {
     <!-- Sims Table -->
     <div class="mb-6">
       <h2 class="text-xl font-semibold mb-2">Sims List</h2>
-      <button id="fetchSimsBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2">Get Sims Data</button>
+      <button id="fetchSimsBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2">Show Total Sims</button>
       <div class="overflow-x-auto rounded-lg shadow-lg hidden" id="simsTableContainer">
         <table id="simsTable" class="w-full text-sm text-left text-gray-600">
           <thead class="bg-gray-800 text-white">
@@ -137,6 +137,43 @@ function renderDashboard() {
       </div>
     </div>
 
+
+    <!-- SIM Assignment History Section -->
+<div class="w-full max-w-7xl mx-auto p-6 bg-white rounded-lg shadow-md mt-6">
+  <h2 class="text-2xl font-bold mb-4 text-gray-800">SIM Assignment History</h2>
+
+  <!-- Fetch Button -->
+  <button id="fetchSimHistoryBtn"
+    onclick="fetchSimHistory()"
+    class="mb-4 px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow hover:bg-blue-700 transition">
+    Get SIM Assignment History
+  </button>
+
+  <!-- Table -->
+  <div class="overflow-x-auto">
+    <table class="w-full border-collapse border border-gray-300 text-sm text-left text-gray-600">
+      <thead class="bg-gray-800 text-white">
+        <tr>
+          <th class="px-4 py-2 border">Assignment ID</th>
+          <th class="px-4 py-2 border">SIM ID</th>
+          <th class="px-4 py-2 border">Phone Number</th>
+          <th class="px-4 py-2 border">Provider</th>
+          <th class="px-4 py-2 border">User ID</th>
+          <th class="px-4 py-2 border">User Name</th>
+          <th class="px-4 py-2 border">Assigned At</th>
+          <th class="px-4 py-2 border">Ended At</th>
+          <th class="px-4 py-2 border">Active</th>
+        </tr>
+      </thead>
+      <tbody id="simHistoryTableBody" class="bg-white divide-y divide-gray-200">
+        <!-- JS will insert rows here -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+
     <!-- POST /users -->
     <div class="mb-6 p-4 bg-white rounded shadow">
       <h2 class="text-xl font-semibold mb-2">POST /users (Create User)</h2>
@@ -152,18 +189,42 @@ function renderDashboard() {
     </div>
 
     <!-- POST /assign -->
-    <div class="mb-6 p-4 bg-white rounded shadow">
-      <h2 class="text-xl font-semibold mb-2">POST /assign</h2>
-      <input type="number" id="assignUserId" placeholder="User ID" class="p-2 border rounded mr-2">
-      <input type="number" id="assignSimId" placeholder="SIM ID" class="p-2 border rounded mr-2">
-      <button onclick="assignSim()" class="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">Assign SIM</button>
-    </div>
+<div class="mb-6 p-4 bg-white rounded shadow">
+  <h2 class="text-xl font-semibold mb-2">POST /assign</h2>
+  <input type="text" id="assignBiometricId" placeholder="Biometric ID (e.g., BIO003)" class="p-2 border rounded mr-2">
+  <input type="number" id="assignSimId" placeholder="SIM ID" class="p-2 border rounded mr-2">
+  <button onclick="assignSim()" class="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">Assign SIM</button>
+</div>
+
+
+<div class="mb-6 p-4 bg-white rounded shadow">
+  <h2 class="text-xl font-semibold mb-2">POST /swap</h2>
+  <input
+    type="text"
+    id="swapBiometricId"
+    placeholder="Biometric ID (e.g., BIO003)"
+    class="p-2 border rounded mr-2"
+  />
+  <input
+    type="number"
+    id="swapSimId"
+    placeholder="New SIM ID"
+    class="p-2 border rounded mr-2"
+  />
+  <button
+    onclick="swapSim()"
+    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+  >
+    Swap SIM
+  </button>
+</div>
+
 
     <!-- POST /exit -->
     <div class="mb-6 p-4 bg-white rounded shadow">
       <h2 class="text-xl font-semibold mb-2">POST /exit</h2>
-      <input type="number" id="exitUserId" placeholder="User ID" class="p-2 border rounded mr-2">
-      <input type="text" id="exitReason" placeholder="Reason" class="p-2 border rounded mr-2">
+      <input type="text" id="exitBiometricId" placeholder="Biometric ID" class="p-2 border rounded mr-2">
+      <input type="text" id="exitReason" placeholder="TypeReason" class="p-2 border rounded mr-2">
       <input type="text" id="exitAdmin" placeholder="Admin Name" class="p-2 border rounded mr-2">
       <button onclick="exitUser()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Exit User</button>
     </div>
@@ -247,36 +308,210 @@ async function createUser() {
   fetchUsers();
 }
 
+////
+//  Fetch SIM Assignment History
+  async function fetchSimHistory() {
+    const token = localStorage.getItem("token");
+
+    try {
+      const res = await fetch("/assign/history", {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      const data = await res.json();
+      const tbody = document.getElementById("simHistoryTableBody");
+      tbody.innerHTML = ""; // clear old rows
+
+      data.forEach(row => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="px-4 py-2 border">${row.assignment_id}</td>
+          <td class="px-4 py-2 border">${row.sim_id}</td>
+          <td class="px-4 py-2 border">${row.phone_number}</td>
+          <td class="px-4 py-2 border">${row.provider}</td>
+          <td class="px-4 py-2 border">${row.user_id}</td>
+          <td class="px-4 py-2 border">${row.user_name}</td>
+          <td class="px-4 py-2 border">${row.assigned_at || '-'}</td>
+          <td class="px-4 py-2 border">${row.unassigned_at || '-'}</td>
+
+          <td class="px-4 py-2 border ${row.active ? 'text-green-600 font-bold' : 'text-gray-500'}">
+            ${row.active ? 'Active' : 'Inactive'}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+    } catch (err) {
+      console.error("Fetch history error:", err);
+      alert("Failed to fetch SIM history");
+    }
+  }
+
+////
+
 // POST /assign
+
 async function assignSim() {
-  const user_id = parseInt(document.getElementById('assignUserId').value);
+  let biometric_id = document.getElementById('assignBiometricId').value.trim();
   const sim_id = parseInt(document.getElementById('assignSimId').value);
-  if(!user_id||!sim_id){alert('Enter both'); return;}
+
+  if (!biometric_id || !sim_id) {
+    alert('Fill all fields');
+    return;
+  }
+
+  // Format biometric_id
+  biometric_id = biometric_id.toUpperCase();
+  if (!/^BIO\d+$/.test(biometric_id)) {
+    alert('Invalid Biometric ID format. Example: BIO003');
+    return;
+  }
+
   const token = localStorage.getItem("token");
-  const res = await fetch('/assign',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
-    body: JSON.stringify({user_id, sim_id})
-  });
-  const data = await res.json();
-  alert(JSON.stringify(data));
+
+  try {
+    const res = await fetch('/assign', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ biometric_id, sim_id })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(`Error: ${data.error || 'Failed to assign SIM'}`);
+      return;
+    }
+
+    alert(`SIM assigned:\n${JSON.stringify(data, null, 2)}`);
+
+    // Clear input fields after successful assign
+    document.getElementById('assignBiometricId').value = '';
+    document.getElementById('assignSimId').value = '';
+
+  } catch (err) {
+    console.error("Assign SIM error:", err);
+    alert('Error assigning SIM');
+  }
 }
+
+
+///
+
+// POST /swap 
+  async function swapSim() {
+    let biometric_id = document
+      .getElementById("swapBiometricId")
+      .value.trim();
+    const new_sim_id = parseInt(document.getElementById("swapSimId").value);
+
+    if (!biometric_id || !new_sim_id) {
+      alert("Fill all fields");
+      return;
+    }
+
+    // Format biometric_id
+    biometric_id = biometric_id.toUpperCase();
+    if (!/^BIO\d+$/.test(biometric_id)) {
+      alert("Invalid Biometric ID format. Example: BIO003");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+
+    try {
+      const res = await fetch("/swap", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ biometric_id, new_sim_id }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(`Error: ${data.error || "Failed to swap SIM"}`);
+        return;
+      }
+
+      alert(`SIM swapped:\n${JSON.stringify(data, null, 2)}`);
+
+      // Clear input fields after success
+      document.getElementById("swapBiometricId").value = "";
+      document.getElementById("swapSimId").value = "";
+    } catch (err) {
+      console.error("Swap SIM error:", err);
+      alert("Error swapping SIM");
+    }
+  }
+  
+
+///
 
 // POST /exit
 async function exitUser() {
-  const user_id = parseInt(document.getElementById('exitUserId').value);
+  // Get values
+  let biometric_id = document.getElementById('exitBiometricId').value.trim();
   const reason = document.getElementById('exitReason').value.trim();
   const admin = document.getElementById('exitAdmin').value.trim();
-  if(!user_id||!reason||!admin){alert('Fill all exit fields'); return;}
+
+  // Validate
+  if (!biometric_id || !reason || !admin) {
+    alert('Fill all exit fields');
+    return;
+  }
+
+  // Ensure format like "BIO003" (uppercase)
+  biometric_id = biometric_id.toUpperCase();
+
+  // Optional: Basic format check
+  if (!/^BIO\d+$/.test(biometric_id)) {
+    alert('Invalid Biometric ID format. Example: BIO003');
+    return;
+  }
+
   const token = localStorage.getItem("token");
-  const res = await fetch('/exit',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
-    body: JSON.stringify({user_id, reason, admin})
-  });
-  const data = await res.json();
-  alert(JSON.stringify(data));
+
+  try {
+    const res = await fetch('/exit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ biometric_id, reason, admin })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(`Error: ${data.error || 'Failed to exit user'}`);
+      return;
+    }
+
+    alert(`Exit logged:\n${JSON.stringify(data, null, 2)}`);
+
+    // Clear fields
+    document.getElementById('exitBiometricId').value = '';
+    document.getElementById('exitReason').value = '';
+    document.getElementById('exitAdmin').value = '';
+
+  } catch (err) {
+    console.error("Exit user error:", err);
+    alert('Error processing exit');
+  }
 }
+
+
+////////
+
+
 
 // Fetch Active Users
 document.addEventListener('click', e => {

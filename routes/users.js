@@ -1,17 +1,20 @@
 // routes/users.js
 import express from 'express';
-import pool from '../db/db.js'; // import the MySQL pool
+import pool from '../db/db.js'; // ✅ MySQL connection pool
 
 const router = express.Router();
 
 
+// ✅ GET /users
 // Example call: /users?page=1&limit=50
-// ✅ Get all users (with phone number if assigned)
+// Fetch all users with pagination + phone assignment details (if assigned)
 router.get('/', async (req, res) => {
+  // Parse pagination params (defaults: page 1, 10 results per page)
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
   const offset = (page - 1) * limit;
 
+  // SQL: Fetch user details + latest active SIM assignment (if exists)
   const query = `
     SELECT 
       u.user_id, u.name, u.branch, u.department, u.office_number,
@@ -33,6 +36,7 @@ router.get('/', async (req, res) => {
     LIMIT ? OFFSET ?;
   `;
 
+  // SQL: Count total users for pagination metadata
   const countQuery = `SELECT COUNT(*) AS total FROM users1`;
 
   try {
@@ -40,11 +44,11 @@ router.get('/', async (req, res) => {
     const [countResult] = await pool.query(countQuery);
 
     res.json({
-      users: rows,
-      total: countResult[0].total,
-      page,
-      limit,
-      totalPages: Math.ceil(countResult[0].total / limit),
+      users: rows,                             // ✅ List of users
+      total: countResult[0].total,             // ✅ Total count of users
+      page,                                    // ✅ Current page
+      limit,                                   // ✅ Limit per page
+      totalPages: Math.ceil(countResult[0].total / limit), // ✅ Total pages
     });
   } catch (err) {
     console.error("Fetch users error:", err);
@@ -52,7 +56,10 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get max biometric_id from the users1 table
+
+// ✅ GET /users/max-bio
+// Fetch maximum biometric_id currently in the table
+// Useful to safely generate next biometric ID from backend
 router.get("/max-bio", async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT MAX(biometric_id) AS max FROM users1");
@@ -65,30 +72,28 @@ router.get("/max-bio", async (req, res) => {
 });
 
 
-// ✅ Add user (onboarding)
-// POST /users
+// ✅ POST /users
+// Create a new user (employee onboarding)
+// Auto-generates a sequential numeric biometric_id
 router.post("/", async (req, res) => {
   try {
     const { name, branch, office_number, department, official_email } = req.body;
 
-    // Generate next biometric_id in DB safely
+    // 1️⃣ Get current max biometric_id and increment by 1
     const [rows] = await pool.query("SELECT MAX(biometric_id) AS max FROM users1");
     const nextBio = (rows[0].max || 0) + 1;
 
-      // 🔒 Basic validations
+    // 2️⃣ Validate biometric_id limit
     if (nextBio > 9999) {
       return res.status(400).json({ error: "Biometric ID limit reached (9999)" });
     }
 
-    
-  if (!name || !branch) {
+    // 3️⃣ Validate required fields
+    if (!name || !branch) {
+      return res.status(400).json({ error: "Missing required fields: name and branch are required" });
+    }
 
-    return res.status(400).json({ error: "Missing required fields: name and branch are required" });
-
-  }
-
-    
-
+    // 4️⃣ Insert new user record
     const insertQuery = `
       INSERT INTO users1 (name, branch, office_number, department, biometric_id, official_email)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -98,6 +103,7 @@ router.post("/", async (req, res) => {
       name, branch, office_number, department, nextBio, official_email
     ]);
 
+    // 5️⃣ Respond with newly created user details
     res.json({ 
       user_id: result.insertId, 
       biometric_id: nextBio, 
@@ -109,6 +115,5 @@ router.post("/", async (req, res) => {
     res.status(500).json({ error: "Failed to insert user" });
   }
 });
-
 
 export default router;

@@ -52,40 +52,63 @@ router.get('/', async (req, res) => {
   }
 });
 
-
-// ✅ Add user (onboarding)
-router.post('/', async (req, res) => {
-  const { name, branch, office_number, department, biometric_id, official_email } = req.body;
-
-  // 🔒 Basic validations
-  if (!name || !branch) {
-    return res.status(400).json({ error: "Missing required fields: name and branch are required" });
-  }
-
-  const insertUserQuery = `
-    INSERT INTO users1 (name, branch, office_number, department, biometric_id, official_email)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `;
-
+// Get max biometric_id from the users1 table
+router.get("/max-bio", async (req, res) => {
   try {
-    // Execute insert
-    const [result] = await pool.query(insertUserQuery, [
-      name,
-      branch,
-      office_number,
-      department,
-      biometric_id,
-      official_email,
-    ]);
-
-    // Fetch the inserted user by user_id
-    const [rows] = await pool.query("SELECT * FROM users1 WHERE user_id = ?", [result.insertId]);
-
-    res.status(201).json(rows[0]); // return the new row
+    const [rows] = await pool.query("SELECT MAX(biometric_id) AS max FROM users1");
+    const maxBio = rows[0].max || 0; // fallback to 0 if table is empty
+    res.json({ max: maxBio });
   } catch (err) {
-    console.error("Insert user error:", err);
-    res.status(500).send("Error inserting user");
+    console.error("Error fetching max biometric_id:", err);
+    res.status(500).json({ error: "Database error" });
   }
 });
+
+
+// ✅ Add user (onboarding)
+// POST /users
+router.post("/", async (req, res) => {
+  try {
+    const { name, branch, office_number, department, official_email } = req.body;
+
+    // Generate next biometric_id in DB safely
+    const [rows] = await pool.query("SELECT MAX(biometric_id) AS max FROM users1");
+    const nextBio = (rows[0].max || 0) + 1;
+
+      // 🔒 Basic validations
+    if (nextBio > 9999) {
+      return res.status(400).json({ error: "Biometric ID limit reached (9999)" });
+    }
+
+    
+  if (!name || !branch) {
+
+    return res.status(400).json({ error: "Missing required fields: name and branch are required" });
+
+  }
+
+    
+
+    const insertQuery = `
+      INSERT INTO users1 (name, branch, office_number, department, biometric_id, official_email)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+
+    const [result] = await pool.query(insertQuery, [
+      name, branch, office_number, department, nextBio, official_email
+    ]);
+
+    res.json({ 
+      user_id: result.insertId, 
+      biometric_id: nextBio, 
+      name, branch, office_number, department, official_email 
+    });
+
+  } catch (err) {
+    console.error("Insert user error:", err);
+    res.status(500).json({ error: "Failed to insert user" });
+  }
+});
+
 
 export default router;

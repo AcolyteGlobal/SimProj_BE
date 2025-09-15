@@ -408,13 +408,30 @@ function changePageSize() {
 
 ////////////
 
-// POST /users
-function generateBiometricId() {
-  const timestamp = Date.now(); // e.g. 1694595123456
-  const rand = Math.floor(100 + Math.random() * 900); // 3 digits
-  return Number(`${timestamp}${rand}`);
+// --- Generate Biometric ID from backend max for POST /Users ---
+// --- Fetch next available biometric ID ---
+async function fetchNextBiometricId() {
+  try {
+    const res = await fetch('/users/max-bio');
+    const data = await res.json();
+    const nextId = (data.max || 0) + 1;
+
+    if (nextId > 9999) {
+      alert("Biometric ID limit reached (9999)");
+      return null;
+    }
+
+    // Display in input field
+    document.getElementById('userBio').value = nextId;
+    return nextId;
+  } catch (err) {
+    console.error("Error fetching next biometric_id:", err);
+    alert("Error fetching biometric ID");
+    return null;
+  }
 }
 
+// --- Create User ---
 async function createUser() {
   const name = document.getElementById('userName').value.trim();
   const branch = document.getElementById('userBranch').value.trim();
@@ -422,8 +439,9 @@ async function createUser() {
   const department = document.getElementById('userDept').value.trim();
   const official_email = document.getElementById('userEmail').value.trim();
 
-  const biometric_id = generateBiometricId();
-  document.getElementById('userBio').value = biometric_id;
+  // Always use backend-generated biometric_id
+  const biometric_id = await fetchNextBiometricId();
+  if (!biometric_id) return;
 
   if (!name || !branch || !office_number || !department || !official_email) {
     alert('Fill all fields');
@@ -434,13 +452,38 @@ async function createUser() {
 
   const res = await fetch('/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ name, branch, office_number, department, biometric_id, official_email })
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}` 
+    },
+    body: JSON.stringify({ name, branch, office_number, department, official_email })
   });
 
   const data = await res.json();
-  fetchUsers();
+
+  if (!res.ok) {
+    alert(`Error: ${data.error || "Failed to create user"}`);
+    return;
+  }
+
+  alert(`User created:\n${JSON.stringify(data, null, 2)}`);
+  fetchUsers(); //refershes the table
+
+
+  
+  // ✅ Clear all input fields
+  document.getElementById('userName').value = '';
+  document.getElementById('userBranch').value = '';
+  document.getElementById('userOffice').value = '';
+  document.getElementById('userDept').value = '';
+  document.getElementById('userEmail').value = '';
+  document.getElementById('userBio').value = ''; // clear generated ID
 }
+
+///
+
+
+
 
 
 ////

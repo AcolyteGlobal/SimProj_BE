@@ -22,9 +22,10 @@
 
 
 <script>
+// Grab main container
 const app = document.getElementById("app");
 
-// Render Login Form
+// ---------------- Render Login ----------------
 function renderLogin() {
   app.innerHTML = `
     <div class="max-w-md mx-auto bg-white p-6 rounded shadow">
@@ -38,33 +39,43 @@ function renderLogin() {
     </div>
   `;
 
+  // 🔑 Attach login event
   document.getElementById("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+
     const username = document.getElementById("username").value;
     const password = document.getElementById("password").value;
 
     try {
+      // Call backend login API
       const res = await fetch("/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password })
       });
+
       const data = await res.json();
+
       if (res.ok) {
+        // ✅ Save token in localStorage
         localStorage.setItem("token", data.token);
+
+        // Show dashboard after login
         renderDashboard();
       } else {
+        // ❌ Show error
         const errorMsg = document.getElementById("errorMsg");
         errorMsg.textContent = data.error || "Login failed";
         errorMsg.classList.remove("hidden");
       }
-    } catch(err) {
+    } catch (err) {
       console.error(err);
-      alert("Login error");
+      alert("Login error, please try again.");
     }
   });
 }
 
+// ---------------- Render Dashboard ----------------
 // Render Dashboard
 function renderDashboard() {
   app.innerHTML = `

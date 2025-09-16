@@ -17,6 +17,32 @@ app.use(express.json());
 // ✅ Serve static assets (CSS/JS/images)
 app.use("/public", express.static(path.join(__dirname, "public")));
 
+//
+// Load admins from .env (stored as JSON)
+const admins = JSON.parse(process.env.ADMINS);
+
+// ---------------- LOGIN ----------------
+app.post("/login", express.json(), (req, res) => {
+  const { username, password } = req.body;
+
+  // Find matching admin
+  const admin = admins.find(a => a.user === username && a.pass === password);
+
+  if (!admin) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  // Generate JWT
+  const token = jwt.sign(
+    { username: admin.user, role: "admin" },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" }
+  );
+
+  res.json({ token });
+});
+
+
 // ---------------- MIDDLEWARE ----------------
 function authorizeRole(allowedRoles) {
   return (req, res, next) => {

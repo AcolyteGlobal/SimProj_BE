@@ -10,7 +10,8 @@ router.get('/history', async (req, res) => {
     const [rows] = await pool.query(`
       SELECT a.assignment_id, a.user_id, u.name AS user_name,
              s.sim_id, s.phone_number, s.provider,
-             a.assigned_at, a.unassigned_at, a.active
+             a.assigned_at, a.unassigned_at, a.active,
+             s.handled_by_admin
       FROM sim_assignment a
       JOIN users1 u ON a.user_id = u.user_id
       JOIN sim_inventory s ON a.sim_id = s.sim_id
@@ -36,6 +37,13 @@ router.post("/", async (req, res) => {
       .status(400)
       .json({ error: "Missing required fields: biometric_id and phone_number are required" });
   }
+
+  
+  // Logged-in admin name from JWT via authorizeRole
+
+  const adminName = req.user?.username || "system";
+
+
 
   try {
     const connection = await pool.getConnection();
@@ -104,17 +112,26 @@ await connection.query(
         [user_id, sim_id]
       );
 
-      // 5️⃣ Update SIM status
+      // 5️⃣ Update SIM status and record admin
+
       await connection.query(
-        `UPDATE sim_inventory SET status = 'assigned', updated_at = NOW() WHERE sim_id = ?`,
-        [sim_id]
+
+        `UPDATE sim_inventory 
+
+         SET status = 'assigned', handled_by_admin = ?, updated_at = NOW() 
+
+         WHERE sim_id = ?`,
+
+        [adminName, sim_id]
+
       );
 
 // Fetch inserted assignment with details
 const [rows] = await connection.query(
   `SELECT a.assignment_id, a.user_id, u.name AS user_name, u.biometric_id,
           s.sim_id, s.phone_number, s.provider,
-          a.assigned_at, a.unassigned_at, a.active
+          a.assigned_at, a.unassigned_at, a.active,
+          s.handled_by_admin
    FROM sim_assignment a
    JOIN users1 u ON a.user_id = u.user_id
    JOIN sim_inventory s ON a.sim_id = s.sim_id

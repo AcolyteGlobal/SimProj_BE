@@ -1,30 +1,36 @@
-import express from 'express';
-import pool from '../db/db.js'; // import the pool
-
+// routes/users.js
+import express from "express";
+import pool from "../db/db.js"; // MySQL pool
 
 const router = express.Router();
 
-// GET all users
-// router.get("/", async (req, res) => {
-//   try {
-//     const result = await pool.query("SELECT * FROM acolyte.users");
-//     res.json(result.rows); // send all users as JSON
-//   } catch (err) {
-//     console.error(err.message);
-//     res.status(500).send("Server Error");
-//   }
-// });
-
-// GET all users
+// GET all users with handled_by_admin (if present)
 router.get("/", async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM users1"); 
-    res.json(rows); // send rows only for MySQL
+    // Select all user fields + handled_by_admin if exists
+    const query = `
+      SELECT 
+        user_id,
+        name,
+        branch,
+        office_number,
+        department,
+        biometric_id,
+        official_email,
+        status,
+        created_at,
+        updated_at,
+        handled_by_admin   -- new column to track which admin added/updated
+      FROM users1
+      ORDER BY user_id ASC
+    `;
+
+    const [rows] = await pool.query(query);
+    res.json(rows);
   } catch (err) {
-    console.error(err.message);
+    console.error("Fetch users error:", err);
     res.status(500).send("Server Error");
   }
 });
-
 
 export default router;

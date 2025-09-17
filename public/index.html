@@ -112,9 +112,11 @@ function DashboardComponent() {
 
 /* ---------------- USERS COMPONENT ---------------- */
 /* ---------------- USERS COMPONENT (Singleton) ---------------- */
+// -
+// ---------------- USERS COMPONENT ----------------
+// ---------------- USERS COMPONENT ----------------
 const UsersComponent = (() => {
   return {
-    // Local state for users
     state: {
       allUsersData: [],
       currentPage: 1,
@@ -127,22 +129,34 @@ const UsersComponent = (() => {
       <div class="bg-white p-6 rounded-xl shadow mb-6">
         <h2 class="text-xl font-bold mb-4">Users</h2>
 
-        <!-- Search Bar -->
-        <div class="mb-4 flex justify-between">
-          <input type="text" id="searchInput" placeholder="Search users"
-            class="p-2 border rounded w-1/3"
-            onkeydown="if(event.key==='Enter'){ UsersComponent.search() }">
-          <select id="pageSize" onchange="UsersComponent.changePageSize()" class="border p-2 rounded">
-            <option value="10" selected>10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-          </select>
+        <!-- Search Bar + Page Size -->
+        <div class="mb-4 flex justify-between items-center">
+          <div class="flex space-x-2">
+            <input type="text" id="searchInput" placeholder="Search users"
+              class="p-2 border rounded w-64 shadow-sm focus:ring focus:ring-green-300"
+              onkeydown="if(event.key==='Enter'){ UsersComponent.search() }"
+              aria-label="Search users">
+            <button onclick="UsersComponent.search()"
+              class="px-4 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700">
+              Search
+            </button>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <label for="pageSize" class="sr-only">Select page size</label>
+            <select id="pageSize" onchange="UsersComponent.changePageSize()"
+              class="border p-2 rounded shadow-sm">
+              <option value="10" selected>10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+            </select>
+          </div>
         </div>
 
         <!-- Table -->
         <div class="overflow-x-auto">
-          <table class="min-w-full border rounded-lg">
-            <thead class="bg-gray-200">
+          <table class="min-w-full border rounded-lg text-sm text-gray-700">
+            <thead class="bg-gray-800 text-white">
               <tr>
                 <th class="px-4 py-2">User ID</th>
                 <th class="px-4 py-2">Name</th>
@@ -155,6 +169,7 @@ const UsersComponent = (() => {
                 <th class="px-4 py-2">Status</th>
                 <th class="px-4 py-2">Created</th>
                 <th class="px-4 py-2">Updated</th>
+                <th class="px-4 py-2">Handled By</th>
               </tr>
             </thead>
             <tbody id="usersTableBody"></tbody>
@@ -163,10 +178,17 @@ const UsersComponent = (() => {
 
         <!-- Pagination -->
         <div class="flex justify-between items-center mt-4">
-          <button id="prevBtn" onclick="UsersComponent.prevPage()" class="px-3 py-1 bg-gray-300 rounded">Prev</button>
-          <span id="pageInfo" class="text-gray-700"></span>
-          <button id="nextBtn" onclick="UsersComponent.nextPage()" class="px-3 py-1 bg-gray-300 rounded">Next</button>
-          <select id="pageSizeBottom" onchange="UsersComponent.changePageSize()" class="border p-2 rounded ml-4">
+          <button id="prevBtn" onclick="UsersComponent.prevPage()"
+            class="px-3 py-1 bg-gray-600 text-white rounded-xl shadow hover:bg-gray-700">
+            Prev
+          </button>
+          <span id="pageInfo" class="text-gray-700 font-medium"></span>
+          <button id="nextBtn" onclick="UsersComponent.nextPage()"
+            class="px-3 py-1 bg-gray-600 text-white rounded-xl shadow hover:bg-gray-700">
+            Next
+          </button>
+          <select id="pageSizeBottom" onchange="UsersComponent.changePageSize()"
+            class="border p-2 rounded shadow-sm ml-4">
             <option value="10" selected>10</option>
             <option value="25">25</option>
             <option value="50">50</option>
@@ -189,38 +211,59 @@ const UsersComponent = (() => {
         });
         const data = await res.json();
 
-        // Update state
         UsersComponent.state.allUsersData = data.users;
         UsersComponent.state.currentPage = data.page;
         UsersComponent.state.totalPages = data.totalPages;
 
-        // Render
         UsersComponent.populateTable(data.users);
         UsersComponent.updatePaginationControls();
       } catch (err) {
         console.error("Fetch Users Failed:", err);
+        const tableBody = document.getElementById("usersTableBody");
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="12" class="text-center py-3 text-red-600">Error loading users</td></tr>`;
       }
     },
 
-    // Search locally
+    // Search across all columns (numeric fields safely converted to string)
     search: () => {
-      const query = document.getElementById("searchInput").value.trim().toLowerCase();
+      const input = document.getElementById("searchInput");
+      if (!input) return;
+
+      const query = input.value.trim().toLowerCase();
       if (!query) {
         UsersComponent.populateTable(UsersComponent.state.allUsersData);
         return;
       }
+
       const filtered = UsersComponent.state.allUsersData.filter(u =>
-        u.name?.toLowerCase().includes(query)
+        (u.user_id?.toString().toLowerCase().includes(query)) ||
+        (u.name?.toString().toLowerCase().includes(query)) ||
+        (u.branch?.toString().toLowerCase().includes(query)) ||
+        (u.office_number?.toString().toLowerCase().includes(query)) ||
+        (u.department?.toString().toLowerCase().includes(query)) ||
+        (u.biometric_id?.toString().toLowerCase().includes(query)) ||
+        (u.official_email?.toString().toLowerCase().includes(query)) ||
+        (u.phone_number?.toString().toLowerCase().includes(query)) ||
+        (u.status?.toString().toLowerCase().includes(query)) ||
+        (u.created_at?.toString().toLowerCase().includes(query)) ||
+        (u.updated_at?.toString().toLowerCase().includes(query)) ||
+        (u.handled_by_admin?.toString().toLowerCase().includes(query))
       );
+
       UsersComponent.populateTable(filtered);
     },
 
-    // Fill table rows
+    // Populate table
     populateTable: (users) => {
       const tableBody = document.getElementById("usersTableBody");
       tableBody.innerHTML = "";
+      if (!users || users.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="12" class="text-center py-3">No users found</td></tr>`;
+        return;
+      }
+
       users.forEach(u => {
-        tableBody.innerHTML += `
+        tableBody.insertAdjacentHTML("beforeend", `
           <tr>
             <td class="px-4 py-3">${u.user_id || "-"}</td>
             <td class="px-4 py-3 font-medium text-gray-900">${u.name || "-"}</td>
@@ -237,12 +280,23 @@ const UsersComponent = (() => {
             </td>
             <td class="px-4 py-3">${u.created_at?.split("T")[0] || "-"}</td>
             <td class="px-4 py-3">${u.updated_at?.split("T")[0] || "-"}</td>
+            <td class="px-4 py-3">${u.handled_by_admin || "-"}</td>
           </tr>
-        `;
+        `);
       });
     },
 
     // Pagination controls
+    prevPage: () => {
+      if (UsersComponent.state.currentPage > 1) {
+        UsersComponent.fetchUsers(UsersComponent.state.currentPage - 1);
+      }
+    },
+    nextPage: () => {
+      if (UsersComponent.state.currentPage < UsersComponent.state.totalPages) {
+        UsersComponent.fetchUsers(UsersComponent.state.currentPage + 1);
+      }
+    },
     updatePaginationControls: () => {
       document.getElementById("pageInfo").textContent =
         `Page ${UsersComponent.state.currentPage} of ${UsersComponent.state.totalPages}`;
@@ -250,33 +304,25 @@ const UsersComponent = (() => {
       document.getElementById("nextBtn").disabled = UsersComponent.state.currentPage === UsersComponent.state.totalPages;
     },
 
-    // Next/Prev handlers
-    nextPage: () => {
-      if (UsersComponent.state.currentPage < UsersComponent.state.totalPages) {
-        UsersComponent.fetchUsers(UsersComponent.state.currentPage + 1);
-      }
-    },
-    prevPage: () => {
-      if (UsersComponent.state.currentPage > 1) {
-        UsersComponent.fetchUsers(UsersComponent.state.currentPage - 1);
-      }
-    },
-
-    // Change page size
+    // Change page size and sync both selects
     changePageSize: () => {
-      const topSelect = document.getElementById("pageSize");
-      const bottomSelect = document.getElementById("pageSizeBottom");
-      const newLimit = parseInt(topSelect?.value || bottomSelect?.value);
+      const top = parseInt(document.getElementById("pageSize").value);
+      const bottom = parseInt(document.getElementById("pageSizeBottom").value);
+      const size = top || bottom;
 
-      UsersComponent.state.limit = newLimit;
-      UsersComponent.state.currentPage = 1;
-      if (topSelect) topSelect.value = newLimit;
-      if (bottomSelect) bottomSelect.value = newLimit;
-
+      UsersComponent.state.limit = size;
       UsersComponent.fetchUsers(1);
+
+      // Keep both selects in sync
+      document.getElementById("pageSize").value = size;
+      document.getElementById("pageSizeBottom").value = size;
     }
   };
 })();
+
+
+
+
 
 
 
@@ -894,118 +940,177 @@ const ExitUserComponent = {
 
 // ---------------- EXIT LOG COMPONENT ----------------
 // ---------------- EXIT LOG COMPONENT ----------------
-const ExitLogComponent = {
-  currentPage: 1,
-  limit: 5, // default rows per page
+const ExitLogComponent = (() => {
+  return {
+    state: {
+      allLogsData: [],
+      currentPage: 1,
+      limit: 10,
+      totalPages: 1
+    },
 
-  render: () => {
-    return `
-      <div class="bg-white shadow rounded-lg p-6">
-        <h2 class="text-xl font-bold mb-4">Exit Logs</h2>
-        <button 
-          id="fetchExitLogsBtn" 
-          class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 mb-4">
-          Show Exit Logs
-        </button>
-        <div class="overflow-x-auto rounded-lg shadow hidden" id="exitLogsContainer">
+    // Render Exit Log UI
+    render: () => `
+      <section class="mb-10">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Exit Logs</h2>
+
+        <!-- Search + Page size -->
+        <div class="mb-4 flex items-center space-x-3">
+          <input type="text" id="exitSearchInput" placeholder="Search logs"
+            class="p-2 border rounded-lg w-1/3 shadow-sm focus:ring focus:ring-green-300"
+            onkeydown="if(event.key==='Enter'){ ExitLogComponent.search() }">
+          <button onclick="ExitLogComponent.search()"
+            class="px-4 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700">
+            Search
+          </button>
+          <select id="exitPageSize" onchange="ExitLogComponent.changePageSize()"
+            class="border p-2 rounded-lg shadow-sm">
+            <option value="10" selected>10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto bg-white shadow rounded-lg">
           <table class="w-full text-sm text-left text-gray-600">
             <thead class="bg-gray-800 text-white">
-              <tr>
-                <th class="px-4 py-3">Exit ID</th>
-                <th class="px-4 py-3">User ID</th>
-                <th class="px-4 py-3">Biometric ID</th>
-                <th class="px-4 py-3">Phone Number</th>
-                <th class="px-4 py-3">Reason</th>
-                <th class="px-4 py-3">Handled By</th>
-                <th class="px-4 py-3">Exit Date</th>
-              </tr>
+                <tr>
+        <th class="px-4 py-3">Exit ID</th>
+        <th class="px-4 py-3">User ID</th>
+        <th class="px-4 py-3">Name</th> <!-- Added Name column -->
+        <th class="px-4 py-3">Exit Date</th>
+        <th class="px-4 py-3">Reason</th>
+        <th class="px-4 py-3">Handled By</th>
+      </tr>
             </thead>
-            <tbody id="exitLogsBody" class="bg-white divide-y divide-gray-200"></tbody>
+            <tbody id="exitLogsBody"></tbody>
           </table>
-
-          <!-- Pagination Controls -->
-          <div class="flex justify-between items-center mt-4">
-            <button id="prevExitPage" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Prev</button>
-            <span id="exitPageInfo" class="text-sm text-gray-600"></span>
-            <button id="nextExitPage" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Next</button>
-          </div>
         </div>
-      </div>
-    `;
-  },
 
-  load: () => {
-    const btn = document.getElementById("fetchExitLogsBtn");
-    const tbody = document.getElementById("exitLogsBody");
-    const container = document.getElementById("exitLogsContainer");
-    const pageInfo = document.getElementById("exitPageInfo");
-    const prevBtn = document.getElementById("prevExitPage");
-    const nextBtn = document.getElementById("nextExitPage");
+        <!-- Pagination -->
+        <div class="flex justify-between items-center mt-4">
+          <button onclick="ExitLogComponent.prevPage()"
+            class="px-4 py-2 bg-gray-600 text-white rounded-xl shadow hover:bg-gray-700">
+            Prev
+          </button>
+          <span id="exitPageInfo" class="text-gray-700 font-medium"></span>
+          <button onclick="ExitLogComponent.nextPage()"
+            class="px-4 py-2 bg-gray-600 text-white rounded-xl shadow hover:bg-gray-700">
+            Next
+          </button>
+          <select id="exitPageSizeBottom" onchange="ExitLogComponent.changePageSize()"
+            class="border p-2 rounded-lg shadow-sm ml-4">
+            <option value="10" selected>10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+      </section>
+    `,
 
-    async function fetchLogs(page = 1) {
+    // Load initial data
+    load: async () => {
+      await ExitLogComponent.fetchLogs();
+    },
+
+    // Fetch logs from API
+    fetchLogs: async (page = 1) => {
       try {
-        const res = await fetch(`http://localhost:4000/exit/logs?page=${page}&limit=${ExitLogComponent.limit}`, {
-          headers: {
-            "Authorization": "Bearer " + localStorage.getItem("token")
-          }
+        const token = localStorage.getItem("token");
+        const limit = ExitLogComponent.state.limit;
+        const res = await fetch(`/exit/logs?page=${page}&limit=${limit}`, {
+          headers: { "Authorization": `Bearer ${token}` }
         });
 
         if (!res.ok) throw new Error("Failed to fetch exit logs");
 
         const { data, page: current, totalPages } = await res.json();
-        tbody.innerHTML = "";
 
-        if (Array.isArray(data) && data.length > 0) {
-          data.forEach(log => {
-            tbody.insertAdjacentHTML("beforeend", `
-              <tr>
-                <td class="px-4 py-3">${log.exit_id}</td>
-                <td class="px-4 py-3">${log.user_id}</td>
-                <td class="px-4 py-3">${log.biometric_id}</td>
-                <td class="px-4 py-3">${log.phone_number || "-"}</td>
-                <td class="px-4 py-3">${log.reason}</td>
-                <td class="px-4 py-3">${log.handled_by_admin}</td>
-                <td class="px-4 py-3">${new Date(log.exit_date).toLocaleString()}</td>
-              </tr>
-            `);
-          });
-        } else {
-          tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">No exit logs found</td></tr>`;
-        }
+        ExitLogComponent.state.allLogsData = data;
+        ExitLogComponent.state.currentPage = current;
+        ExitLogComponent.state.totalPages = totalPages;
 
-        // Update pagination UI
-        ExitLogComponent.currentPage = current;
-        pageInfo.textContent = `Page ${current} of ${totalPages}`;
-        prevBtn.disabled = current === 1;
-        nextBtn.disabled = current === totalPages;
-
-        container.classList.remove("hidden");
+        ExitLogComponent.populateTable(data);
+        ExitLogComponent.updatePaginationControls();
       } catch (err) {
         console.error("Fetch Exit Logs Failed:", err);
-        tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-3 text-center text-red-600">Error loading logs</td></tr>`;
-        container.classList.remove("hidden");
+        alert("Error loading exit logs. Check if backend is running.");
       }
-    }
+    },
 
-    if (btn) {
-      btn.addEventListener("click", () => fetchLogs(1));
-    }
+    // Populate table
+    populateTable: (logs) => {
+      const tbody = document.getElementById("exitLogsBody");
+      tbody.innerHTML = "";
 
-    if (prevBtn) {
-      prevBtn.addEventListener("click", () => {
-        if (ExitLogComponent.currentPage > 1) {
-          fetchLogs(ExitLogComponent.currentPage - 1);
-        }
-      });
-    }
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3">No logs found</td></tr>`;
+        return;
+      }
 
-    if (nextBtn) {
-      nextBtn.addEventListener("click", () => {
-        fetchLogs(ExitLogComponent.currentPage + 1);
-      });
-    }
+      logs.forEach(log => {
+  tbody.insertAdjacentHTML("beforeend", `
+    <tr>
+      <td class="px-4 py-3">${log.exit_id}</td>
+      <td class="px-4 py-3">${log.user_id}</td>
+      <td class="px-4 py-3">${log.user_name || "-"}</td> <!-- added user name -->
+      <td class="px-4 py-3">${log.exit_date || "-"}</td> <!-- exit date -->
+      <td class="px-4 py-3">${log.reason || "-"}</td>
+      <td class="px-4 py-3">${log.handled_by_admin || "-"}</td> <!-- handled by admin -->
+    </tr>
+  `);
+});
+    },
+
+    // Pagination controls
+    prevPage: () => {
+      if (ExitLogComponent.state.currentPage > 1) {
+        ExitLogComponent.fetchLogs(ExitLogComponent.state.currentPage - 1);
+      }
+    },
+    nextPage: () => {
+      if (ExitLogComponent.state.currentPage < ExitLogComponent.state.totalPages) {
+        ExitLogComponent.fetchLogs(ExitLogComponent.state.currentPage + 1);
+      }
+    },
+    updatePaginationControls: () => {
+      document.getElementById("exitPageInfo").textContent = 
+        `Page ${ExitLogComponent.state.currentPage} of ${ExitLogComponent.state.totalPages}`;
+    },
+
+    // Search locally
+search: () => {
+  const input = document.getElementById("exitSearchInput");
+  if (!input) return; // safety check
+
+  const query = input.value.trim().toLowerCase();
+  if (!query) {
+    // If empty, show all logs
+    ExitLogComponent.populateTable(ExitLogComponent.state.allLogsData);
+    return;
   }
-};
+
+  // Filter logs based on multiple fields
+  const filtered = ExitLogComponent.state.allLogsData.filter(log =>
+    (log.user_id?.toString().includes(query)) ||
+    (log.user_name?.toLowerCase().includes(query)) ||
+    (log.reason?.toLowerCase().includes(query)) ||
+    (log.handled_by_admin?.toLowerCase().includes(query))
+  );
+
+  ExitLogComponent.populateTable(filtered);
+},
+
+    // Change page size
+    changePageSize: () => {
+      const size = parseInt(document.getElementById("exitPageSize").value);
+      ExitLogComponent.state.limit = size;
+      ExitLogComponent.fetchLogs(1);
+    }
+  };
+})();
+
 
 
 

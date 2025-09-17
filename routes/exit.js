@@ -16,6 +16,8 @@ router.get("/", async (req, res) => {
 });
 
 
+
+/////////
 // GET /exit/logs?page=1&limit=10
 router.get("/logs", async (req, res) => {
   try {
@@ -27,9 +29,14 @@ router.get("/logs", async (req, res) => {
     const [countRows] = await pool.query("SELECT COUNT(*) as count FROM acolyte.exit_log");
     const total = countRows[0].count;
 
-    // Fetch paginated logs
+    // Fetch logs with user name
     const [rows] = await pool.query(
-      "SELECT * FROM acolyte.exit_log ORDER BY exit_id DESC LIMIT ? OFFSET ?",
+      `SELECT e.exit_id, e.user_id, u.name as user_name, e.exit_date, e.reason,
+              e.biometric_id, e.phone_number, e.handled_by_admin
+       FROM acolyte.exit_log e
+       JOIN acolyte.users1 u ON e.user_id = u.user_id
+       ORDER BY e.exit_id DESC
+       LIMIT ? OFFSET ?`,
       [limit, offset]
     );
 
@@ -45,6 +52,7 @@ router.get("/logs", async (req, res) => {
     res.status(500).json({ message: "Server Error while fetching exit logs" });
   }
 });
+
 
 
 // ✅ POST /exit user by biometric_id

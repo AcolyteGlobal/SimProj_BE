@@ -4,6 +4,22 @@ import pool from '../db/db.js'; // ✅ MySQL connection pool
 
 const router = express.Router();
 
+//// FOR POST USERS
+/* ---------------- AUTH MIDDLEWARE ---------------- */
+// ✅ Decodes JWT and attaches user to req.user
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) return res.status(401).json({ error: "No token provided" });
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: "Invalid token" });
+    req.user = user; // ✅ attach decoded user
+    next();
+  });
+}
+////
 
 // ✅ GET /users
 // Example call: /users?page=1&limit=50
@@ -82,27 +98,12 @@ router.get("/max-bio", async (req, res) => {
 // ✅ POST /users
 // Create a new user (employee onboarding)
 // Auto-generates a sequential numeric biometric_id
-// ✅ POST /users
-// Create a new user (employee onboarding)
-// Auto-generates a sequential numeric biometric_id
-router.post("/", async (req, res) => {
+  router.post("/", async (req, res) => {
   try {
     const { name, branch, office_number, department, official_email } = req.body;
 
-    // 1️⃣ Get the current admin username from JWT (middleware sets req.user)
-    
-
-    let admin = "Unknown Admin"; // fallback
-
-    if (req.user?.username) {
-
-      admin = req.user.username;
-
-    } else {
-
-      console.warn("JWT missing or invalid! req.user not populated.");
-
-    }
+    // 1️⃣ Get the current admin username from JWT (middleware sets req.user)   
+     const admin = req.user?.username || "system";
 
     // 2️⃣ Get current max biometric_id and increment by 1
     const [rows] = await pool.query("SELECT MAX(biometric_id) AS max FROM users1");

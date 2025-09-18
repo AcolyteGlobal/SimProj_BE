@@ -410,45 +410,42 @@ function ActiveUsersComponent() {
 // ---------------- PostUserComponent Singleton ----------------
 /* ---------------- ADD NEW USER COMPONENT ---------------- */
 /* ---------------- ADD USER COMPONENT ---------------- */
-/* ---------------- ADD NEW USER COMPONENT ---------------- */
-/* ---------------- ADD NEW USER COMPONENT ---------------- */
-/* ---------------- ADD NEW USER COMPONENT ---------------- */
-/* ---------------- ADD NEW USER COMPONENT ---------------- */
-// ==================== AddUserComponent ====================
 const AddUserComponent = (() => {
   return {
+    state: {},
+
     render: () => `
       <section class="mb-6">
         <h2 class="text-xl font-semibold mb-4">Add New User</h2>
 
         <form id="addUserForm" class="space-y-3 bg-white p-4 rounded shadow">
           <div>
-            <label class="block font-semibold mb-1">Name</label>
-            <input type="text" id="name" class="p-2 border rounded w-1/2" required>
+            <label class="block font-semibold mb-1">Name:</label>
+            <input type="text" id="userName" class="p-2 border rounded w-1/2" required>
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Branch</label>
-            <input type="text" id="branch" class="p-2 border rounded w-1/2" required>
+            <label class="block font-semibold mb-1">Branch:</label>
+            <input type="text" id="userBranch" class="p-2 border rounded w-1/2" required>
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Department</label>
-            <input type="text" id="department" class="p-2 border rounded w-1/2">
+            <label class="block font-semibold mb-1">Office Number:</label>
+            <input type="text" id="userOffice" class="p-2 border rounded w-1/2">
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Office Number</label>
-            <input type="text" id="office_number" class="p-2 border rounded w-1/2">
+            <label class="block font-semibold mb-1">Department:</label>
+            <input type="text" id="userDept" class="p-2 border rounded w-1/2">
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Official Email</label>
-            <input type="email" id="official_email" class="p-2 border rounded w-1/2">
+            <label class="block font-semibold mb-1">Official Email:</label>
+            <input type="email" id="userEmail" class="p-2 border rounded w-1/2">
           </div>
 
           <button type="submit" 
-                  class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                  class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
             Add User
           </button>
         </form>
@@ -459,51 +456,79 @@ const AddUserComponent = (() => {
 
     load: () => {
       const form = document.getElementById("addUserForm");
-      if (form) {
-        form.addEventListener("submit", async (e) => {
-          e.preventDefault();
-          await AddUserComponent.addUser();
-        });
-      }
+      if (!form) return;
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await AddUserComponent.addUser();
+      });
     },
 
     addUser: async () => {
-      const name = document.getElementById("name").value.trim();
-      const branch = document.getElementById("branch").value.trim();
-      const department = document.getElementById("department").value.trim();
-      const office_number = document.getElementById("office_number").value.trim();
-      const official_email = document.getElementById("official_email").value.trim();
       const msgDiv = document.getElementById("addUserMsg");
+      msgDiv.textContent = "";
+      msgDiv.className = "mt-3 text-sm font-medium";
+
+      // ✅ Make sure form is defined here
+      const form = document.getElementById("addUserForm");
+      if (!form) {
+        msgDiv.textContent = "Form not found!";
+        msgDiv.className = "text-red-600 mt-2 font-medium";
+        return;
+      }
+
+      const name = document.getElementById("userName")?.value.trim();
+      const branch = document.getElementById("userBranch")?.value.trim();
+      const office_number = document.getElementById("userOffice")?.value.trim();
+      const department = document.getElementById("userDept")?.value.trim();
+      const official_email = document.getElementById("userEmail")?.value.trim();
+
+      if (!name || !branch) {
+        msgDiv.textContent = "Name and Branch are required!";
+        msgDiv.className = "text-red-600 mt-2 font-medium";
+        return;
+      }
+
+      const payload = { name, branch, office_number, department, official_email };
 
       try {
-        const token = localStorage.getItem("token"); // ✅ JWT token
+        const token = localStorage.getItem("token");
         const res = await fetch("/users", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`   // ✅ FIXED
+            "Authorization": `Bearer ${token}`
           },
-          body: JSON.stringify({ name, branch, department, office_number, official_email })
+          body: JSON.stringify(payload)
         });
 
         const data = await res.json();
+
         if (!res.ok) {
-          msgDiv.textContent = data.error || "Failed to add user";
+          // Handle duplicate entry
+          if (data.error?.includes("already exists")) {
+            msgDiv.textContent = `❌ ${data.error}`;
+          } else {
+            msgDiv.textContent = `❌ ${data.error || "Server error while adding user"}`;
+          }
           msgDiv.className = "text-red-600 mt-2 font-medium";
           return;
         }
 
-        msgDiv.textContent = `✅ User ${data.name} created successfully with biometric_id ${data.biometric_id}, Handled by: ${data.handled_by_admin}`;
+        // Success
+        msgDiv.textContent = `✅ User ${data.name} created successfully with Biometric ID ${data.biometric_id}, Handled by: ${data.handled_by_admin}`;
         msgDiv.className = "text-green-600 mt-2 font-medium";
 
-        document.getElementById("addUserForm").reset();
+        form.reset();
 
-        // Refresh user table if component exists
-        if (typeof UsersComponent !== "undefined") UsersComponent.fetchUsers();
+        // Optional: refresh users table if exists
+        if (typeof UsersComponent !== "undefined" && UsersComponent.fetchUsers) {
+          UsersComponent.fetchUsers();
+        }
 
       } catch (err) {
         console.error("Add User Failed:", err);
-        msgDiv.textContent = "❌ Server error while adding user";
+        msgDiv.textContent = "❌ Network/server error while adding user";
         msgDiv.className = "text-red-600 mt-2 font-medium";
       }
     }

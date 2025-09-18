@@ -4,21 +4,8 @@ import pool from '../db/db.js'; // ✅ MySQL connection pool
 
 const router = express.Router();
 
-//// FOR POST USERS
-/* ---------------- AUTH MIDDLEWARE ---------------- */
-// ✅ Decodes JWT and attaches user to req.user
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
 
-  if (!token) return res.status(401).json({ error: "No token provided" });
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: "Invalid token" });
-    req.user = user; // ✅ attach decoded user
-    next();
-  });
-}
 ////
 
 // ✅ GET /users

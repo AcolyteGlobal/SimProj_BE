@@ -480,14 +480,17 @@ const AddUserComponent = (() => {
       const official_email = document.getElementById("userEmail").value.trim();
 
       try {
-        const res = await fetch("/users", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + localStorage.getItem("token") // ✅ always send token
-          },
-          body: JSON.stringify({ name, branch, office_number, department, official_email })
-        });
+        const token = localStorage.getItem("token");
+const res = await fetch("/users", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`   // ✅ FIXED
+  },
+  body: JSON.stringify({ name, branch, office_number, department, official_email })
+});
+
+        
 
         const data = await res.json();
 
@@ -893,70 +896,159 @@ const AddSimComponent = (() => {
 
 
     /* ---------------- ASSIGN SIM COMPONENT ---------------- */
-    function AssignSimComponent() {
-      return {
-        render: () => `
-          <section class="mb-6 p-4 bg-white rounded-lg shadow-md">
-            <h2 class="text-lg font-bold mb-4">Assign SIM</h2>
-            <input type="number" id="assignBiometricId" placeholder="Biometric ID" class="w-full p-2 border rounded mb-2"/>
-            <input type="text" id="assignPhoneNumber" placeholder="Phone Number" class="w-full p-2 border rounded mb-2"/>
-            <button id="assignSimBtn" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Assign SIM</button>
-          </section>
-        `,
-        load: () => {
-          document.addEventListener('click', async e => {
-            if(e.target.id==='assignSimBtn') {
-              const biometric_id = parseInt(document.getElementById('assignBiometricId').value);
-              const phone_number = document.getElementById('assignPhoneNumber').value.trim();
-              if(!biometric_id || !phone_number){alert('Fill all fields'); return;}
-              const token = localStorage.getItem('token');
-              try{
-                let res = await fetch('/assign',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({biometric_id,phone_number})});
-                let data = await res.json();
-                if(res.status===409 && data.requireConfirmation){
-                  if(confirm(data.message)){
-                    res = await fetch('/assign',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({biometric_id,phone_number,force:true})});
-                    data = await res.json();
-                  }
-                }
-                alert(res.ok?`SIM assigned:\n${JSON.stringify(data,null,2)}`:`Error: ${data.error||'Failed'}`);
-                document.getElementById('assignBiometricId').value='';
-                document.getElementById('assignPhoneNumber').value='';
-              }catch(err){console.error(err);alert('Error assigning SIM');}
+    /* ---------------- ASSIGN SIM COMPONENT ---------------- */
+function AssignSimComponent() {
+  return {
+    render: () => `
+      <section class="mb-6 p-4 bg-white rounded-lg shadow-md">
+        <h2 class="text-lg font-bold mb-4">Assign SIM</h2>
+        <input type="number" id="assignBiometricId" placeholder="Biometric ID" 
+          class="w-full p-2 border rounded mb-2"/>
+        <input type="text" id="assignPhoneNumber" placeholder="Phone Number" 
+          class="w-full p-2 border rounded mb-2"/>
+        <button id="assignSimBtn" 
+          class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+          Assign SIM
+        </button>
+        <!-- Message box -->
+        <div id="assignSimMessageBox" class="mt-2 text-sm"></div>
+      </section>
+    `,
+
+    load: () => {
+      document.addEventListener("click", async (e) => {
+        if (e.target.id === "assignSimBtn") {
+          const biometric_id = parseInt(document.getElementById("assignBiometricId").value);
+          const phone_number = document.getElementById("assignPhoneNumber").value.trim();
+          const messageBox = document.getElementById("assignSimMessageBox");
+
+          // Reset message box
+          messageBox.textContent = "";
+          messageBox.className = "mt-2 text-sm";
+
+          if (!biometric_id || !phone_number) {
+            messageBox.textContent = "⚠️ Please fill all fields.";
+            messageBox.classList.add("text-yellow-600");
+            return;
+          }
+
+          const token = localStorage.getItem("token");
+
+          try {
+            let res = await fetch("/assign", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              },
+              body: JSON.stringify({ biometric_id, phone_number })
+            });
+
+            let data = await res.json();
+
+            // If conflict, ask for confirmation
+            if (res.status === 409 && data.requireConfirmation) {
+              if (confirm(data.message)) {
+                res = await fetch("/assign", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ biometric_id, phone_number, force: true })
+                });
+                data = await res.json();
+              }
             }
-          });
+
+            if (res.ok) {
+              messageBox.textContent = `✅ ${data.message || "SIM assigned successfully"} by: ${data.handled_by_admin || "Unknown"}`;
+              messageBox.classList.add("text-green-600");
+            } else {
+              messageBox.textContent = `❌ ${data.error || "Failed to assign SIM"}`;
+              messageBox.classList.add("text-red-600");
+            }
+
+            // Clear inputs
+            document.getElementById("assignBiometricId").value = "";
+            document.getElementById("assignPhoneNumber").value = "";
+
+          } catch (err) {
+            console.error(err);
+            messageBox.textContent = "❌ Error assigning SIM";
+            messageBox.classList.add("text-red-600");
+          }
         }
-      };
+      });
     }
+  };
+}
+
 
     /* ---------------- SWAP SIM COMPONENT ---------------- */
-    function SwapSimComponent() {
-      return {
-        render: () => `
-          <section class="mb-6 p-4 bg-white rounded shadow">
-            <h2 class="text-xl font-semibold mb-2">Swap SIM</h2>
-            <input type="number" id="swapBiometricId" placeholder="Biometric ID" class="p-2 border rounded mr-2"/>
-            <input type="number" id="swapSimId" placeholder="New SIM ID" class="p-2 border rounded mr-2"/>
-            <button id="swapSimBtn" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Swap SIM</button>
-          </section>
-        `,
-        load: () => {
-          document.addEventListener('click', async e=>{
-            if(e.target.id==='swapSimBtn'){
-              const biometric_id = parseInt(document.getElementById('swapBiometricId').value);
-              const new_sim_id = parseInt(document.getElementById('swapSimId').value);
-              if(!biometric_id || !new_sim_id){alert('Fill all fields'); return;}
-              const token = localStorage.getItem('token');
-              const res = await fetch('/swap',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({biometric_id,new_sim_id})});
-              const data = await res.json();
-              alert(res.ok?`SIM swapped:\n${JSON.stringify(data,null,2)}`:`Error: ${data.error||'Failed'}`);
-              document.getElementById('swapBiometricId').value='';
-              document.getElementById('swapSimId').value='';
+ /* ---------------- SWAP SIM COMPONENT ---------------- */
+function SwapSimComponent() {
+  return {
+    render: () => `
+      <section class="mb-6 p-4 bg-white rounded shadow">
+        <h2 class="text-xl font-semibold mb-2">Swap SIM</h2>
+        <input type="number" id="swapBiometricId" placeholder="Biometric ID" class="p-2 border rounded mr-2"/>
+        <input type="number" id="swapSimId" placeholder="New SIM ID" class="p-2 border rounded mr-2"/>
+        <button id="swapSimBtn" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Swap SIM</button>
+        <!-- Message Box for feedback -->
+        <p id="swapMessageBox" class="mt-2 text-sm"></p>
+      </section>
+    `,
+    load: () => {
+      document.addEventListener("click", async (e) => {
+        if (e.target.id === "swapSimBtn") {
+          const biometric_id = parseInt(document.getElementById("swapBiometricId").value);
+          const new_sim_id = parseInt(document.getElementById("swapSimId").value);
+          const messageBox = document.getElementById("swapMessageBox");
+
+          // Validation
+          if (!biometric_id || !new_sim_id) {
+            messageBox.textContent = "⚠️ Please fill all fields";
+            messageBox.className = "mt-2 text-sm text-red-600";
+            return;
+          }
+
+          try {
+            const token = localStorage.getItem("token");
+            const res = await fetch("/swap", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({ biometric_id, new_sim_id }),
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+              // ✅ Success message
+              messageBox.textContent = `✅ SIM swapped successfully! Biometric ID: ${biometric_id}, New SIM ID: ${new_sim_id}, by: ${data.handled_by_admin || "Unknown"}`;
+              messageBox.className = "mt-2 text-sm text-green-600";
+            } else {
+              // ❌ Error message
+              messageBox.textContent = `❌ Error: ${data.error || "Swap failed"}`;
+              messageBox.className = "mt-2 text-sm text-red-600";
             }
-          });
+
+            // Reset fields
+            document.getElementById("swapBiometricId").value = "";
+            document.getElementById("swapSimId").value = "";
+          } catch (err) {
+            messageBox.textContent = `⚠️ Request failed: ${err.message}`;
+            messageBox.className = "mt-2 text-sm text-red-600";
+          }
         }
-      };
-    }
+      });
+    },
+  };
+}
+
 
 
     /////====================================
@@ -1017,7 +1109,8 @@ const ExitUserComponent = {
       const reason = document.getElementById("exitReason").value.trim();
 
       try {
-        const res = await fetch("http://localhost:4000/exit", {
+        const res = await fetch("/exit", {
+
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1032,7 +1125,9 @@ const ExitUserComponent = {
           messageBox.textContent = `❌ ${data.message || "Failed to exit user"}`;
           messageBox.className = "mt-3 text-sm text-red-600";
         } else {
-          messageBox.textContent = `✅ ${data.message || "User exited successfully"}`;
+          messageBox.textContent = `✅ ${data.message || "User exited successfully"} by: ${data.handled_by_admin || "Unknown"}`;
+
+
           messageBox.className = "mt-3 text-sm text-green-600";
           form.reset();
         }

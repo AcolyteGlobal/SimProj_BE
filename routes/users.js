@@ -90,7 +90,19 @@ router.post("/", async (req, res) => {
     const { name, branch, office_number, department, official_email } = req.body;
 
     // 1️⃣ Get the current admin username from JWT (middleware sets req.user)
-    const admin = req.user?.username || "Unknown Admin";
+    
+
+    let admin = "Unknown Admin"; // fallback
+
+    if (req.user?.username) {
+
+      admin = req.user.username;
+
+    } else {
+
+      console.warn("JWT missing or invalid! req.user not populated.");
+
+    }
 
     // 2️⃣ Get current max biometric_id and increment by 1
     const [rows] = await pool.query("SELECT MAX(biometric_id) AS max FROM users1");

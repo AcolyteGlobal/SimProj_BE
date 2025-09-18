@@ -412,6 +412,7 @@ function ActiveUsersComponent() {
 /* ---------------- ADD USER COMPONENT ---------------- */
 /* ---------------- ADD NEW USER COMPONENT ---------------- */
 /* ---------------- ADD NEW USER COMPONENT ---------------- */
+/* ---------------- ADD NEW USER COMPONENT ---------------- */
 const AddUserComponent = (() => {
   return {
     state: {},
@@ -422,31 +423,37 @@ const AddUserComponent = (() => {
 
         <form id="addUserForm" class="space-y-3 bg-white p-4 rounded shadow">
           <div>
-            <label class="block font-semibold mb-1">Name *</label>
-            <input type="text" id="name" placeholder="Employee name" class="p-2 border rounded w-1/2" required>
+            <label class="block font-semibold mb-1">Name:</label>
+            <input type="text" id="userName" placeholder="Employee Name" 
+                   class="p-2 border rounded w-1/2" required>
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Branch *</label>
-            <input type="text" id="branch" placeholder="Branch" class="p-2 border rounded w-1/2" required>
+            <label class="block font-semibold mb-1">Branch:</label>
+            <input type="text" id="branch" placeholder="Branch" 
+                   class="p-2 border rounded w-1/2" required>
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Office Number</label>
-            <input type="text" id="office_number" placeholder="Office Number" class="p-2 border rounded w-1/2">
+            <label class="block font-semibold mb-1">Department:</label>
+            <input type="text" id="department" placeholder="Department" 
+                   class="p-2 border rounded w-1/2">
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Department</label>
-            <input type="text" id="department" placeholder="Department" class="p-2 border rounded w-1/2">
+            <label class="block font-semibold mb-1">Office Number:</label>
+            <input type="text" id="officeNumber" placeholder="Office Number" 
+                   class="p-2 border rounded w-1/2">
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Official Email</label>
-            <input type="email" id="official_email" placeholder="email@company.com" class="p-2 border rounded w-1/2">
+            <label class="block font-semibold mb-1">Official Email:</label>
+            <input type="email" id="officialEmail" placeholder="Email" 
+                   class="p-2 border rounded w-1/2">
           </div>
 
-          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+          <button type="submit" 
+                  class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
             Add User
           </button>
         </form>
@@ -466,19 +473,20 @@ const AddUserComponent = (() => {
     },
 
     addUser: async () => {
-      const name = document.getElementById("name").value.trim();
+      const name = document.getElementById("userName").value.trim();
       const branch = document.getElementById("branch").value.trim();
-      const office_number = document.getElementById("office_number").value.trim();
       const department = document.getElementById("department").value.trim();
-      const official_email = document.getElementById("official_email").value.trim();
+      const office_number = document.getElementById("officeNumber").value.trim();
+      const official_email = document.getElementById("officialEmail").value.trim();
       const msgDiv = document.getElementById("addUserMsg");
 
-      // basic frontend validation
       if (!name || !branch) {
         msgDiv.textContent = "Name and Branch are required!";
         msgDiv.className = "text-red-600 mt-2 font-medium";
         return;
       }
+
+      const payload = { name, branch, department, office_number, official_email };
 
       try {
         const token = localStorage.getItem("token");
@@ -488,34 +496,25 @@ const AddUserComponent = (() => {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
           },
-          body: JSON.stringify({ name, branch, office_number, department, official_email })
+          body: JSON.stringify(payload)
         });
 
         const data = await res.json();
 
-
         if (!res.ok) {
-
-          // Show full error details
-
-          msgDiv.textContent = data.error || "Failed to add user";
-
-          if (data.details) msgDiv.textContent += ` | Details: ${data.details}`;
-
+          msgDiv.textContent = data.error || JSON.stringify(data);
           msgDiv.className = "text-red-600 mt-2 font-medium";
-
           return;
-
         }
 
-        // success
+        // ✅ Show success with admin returned from API
         msgDiv.textContent = `User ${data.name} created successfully with biometric_id ${data.biometric_id}, Handled by: ${data.handled_by_admin}`;
         msgDiv.className = "text-green-600 mt-2 font-medium";
 
-        // clear fields
+        // ✅ Clear form fields
         document.getElementById("addUserForm").reset();
 
-        // optionally refresh UsersComponent table
+        // ✅ Optionally refresh UsersComponent table
         if (typeof UsersComponent !== "undefined") UsersComponent.fetchUsers();
 
       } catch (err) {

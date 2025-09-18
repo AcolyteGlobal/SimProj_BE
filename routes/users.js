@@ -89,15 +89,7 @@ router.get("/max-bio", async (req, res) => {
 });
 
 
-// ✅ POST /users
-// Create a new user (employee onboarding)
-// Auto-generates a sequential numeric biometric_id
-// ✅ POST /users
-// Create a new user (employee onboarding)
-// Auto-generates a sequential numeric biometric_id
-// ✅ POST /users
-// Create a new user (employee onboarding)
-// Auto-generates a sequential numeric biometric_id
+
 // ✅ POST /users
 // Create a new user (employee onboarding)
 // Auto-generates a sequential numeric biometric_id
@@ -108,23 +100,24 @@ router.post("/", async (req, res) => {
     // Admin username from JWT payload
     const adminName = req.user?.username || "system";
 
-    // 1️⃣ Get current max biometric_id and increment by 1
-    const [rows] = await pool.query("SELECT MAX(biometric_id) AS max FROM users1");
-    const nextBio = (rows[0].max || 0) + 1;
-
-    // 2️⃣ Validate biometric_id limit
-    if (nextBio > 9999) {
-      return res.status(400).json({ error: "Biometric ID limit reached (9999)" });
-    }
-
-    // 3️⃣ Validate required fields
+    // 1️⃣ Validate required fields
     if (!name || !branch) {
       return res.status(400).json({ error: "Missing required fields: name and branch are required" });
     }
 
+    // 2️⃣ Get current max biometric_id and increment by 1
+    const [rows] = await pool.query("SELECT MAX(biometric_id) AS max FROM users1");
+    const nextBio = (rows[0].max || 0) + 1;
+
+    // 3️⃣ Validate biometric_id limit
+    if (nextBio > 9999) {
+      return res.status(400).json({ error: "Biometric ID limit reached (9999)" });
+    }
+
     // 4️⃣ Insert new user record (include handled_by_admin)
     const insertQuery = `
-      INSERT INTO users1 (name, branch, office_number, department, biometric_id, official_email, handled_by_admin)
+      INSERT INTO users1 
+        (name, branch, office_number, department, biometric_id, official_email, handled_by_admin)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
@@ -132,11 +125,15 @@ router.post("/", async (req, res) => {
       name, branch, office_number, department, nextBio, official_email, adminName
     ]);
 
-    // 5️⃣ Respond with newly created user details
-    res.json({ 
+    // 5️⃣ Respond with newly created user details (HTTP 201)
+    return res.status(201).json({ 
       user_id: result.insertId, 
       biometric_id: nextBio, 
-      name, branch, office_number, department, official_email,
+      name, 
+      branch, 
+      office_number, 
+      department, 
+      official_email,
       handled_by_admin: adminName
     });
 
@@ -151,9 +148,11 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: `${field} already exists!` });
     }
 
-    res.status(500).json({ error: "Failed to insert user", details: err.message });
+    // Other errors
+    return res.status(500).json({ error: "Failed to insert user", details: err.message });
   }
 });
+
 
 
 export default router;

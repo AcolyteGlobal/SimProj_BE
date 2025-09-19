@@ -189,6 +189,213 @@ init();
 /* ---------------- USERS COMPONENT (Singleton) ---------------- */
 
 /* ---------------- USERS COMPONENT (Singleton) ---------------- */
+// const UsersComponent = (() => {
+//   // ---------------- State ----------------
+//   let users = [];
+//   let page = 1;
+//   const limit = 10;
+//   let total = 0;
+//   let search = "";
+//   let filterActive = true;
+//   let filterDept = "";
+
+//   // ---------------- Render HTML ----------------
+//   function render() {
+//     const totalPages = Math.ceil(total / limit) || 1;
+
+//     return `
+//       <div class="p-4">
+//         <h2 class="text-2xl font-bold mb-6 text-black">Users</h2>
+
+//         <!-- Search + Filters -->
+//         <div class="flex flex-wrap gap-3 mb-6 items-center">
+//           <input 
+//             type="text" 
+//             id="searchInput" 
+//             placeholder="Search users..."
+//             class="border border-gray-300 rounded-lg p-2 flex-1 min-w-[200px]"
+//             value="${search}" 
+//           />
+//           <button id="searchBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+//             Search
+//           </button>
+//           <label class="flex items-center gap-2 text-gray-700">
+//             <input type="checkbox" id="activeFilter" ${filterActive ? "checked" : ""} /> 
+//             Active Only
+//           </label>
+//           <select id="deptFilter" class="border border-gray-300 rounded-lg p-2">
+//             <option value="">All Departments</option>
+//             <option value="IT" ${filterDept === "IT" ? "selected" : ""}>IT</option>
+//             <option value="HR" ${filterDept === "HR" ? "selected" : ""}>HR</option>
+//             <option value="Finance" ${filterDept === "Finance" ? "selected" : ""}>Finance</option>
+//             <option value="Admin" ${filterDept === "Admin" ? "selected" : ""}>Admin</option>
+//           </select>
+//         </div>
+
+//         <!-- Users Table -->
+//         <div class="overflow-x-auto rounded-lg shadow">
+//           <table class="min-w-full border border-gray-200 text-sm">
+//             <thead class="bg-gray-200 text-black uppercase text-xs">
+//               <tr>
+//                 <th class="px-3 py-2 text-left">User ID</th>
+//                 <th class="px-3 py-2 text-left">Name</th>
+//                 <th class="px-3 py-2 text-left">Branch</th>
+//                 <th class="px-3 py-2 text-left">Office No.</th>
+//                 <th class="px-3 py-2 text-left">Department</th>
+//                 <th class="px-3 py-2 text-left">Biometric ID</th>
+//                 <th class="px-3 py-2 text-left">Email</th>
+//                 <th class="px-3 py-2 text-left">Phone</th>
+//                 <th class="px-3 py-2 text-left">Status</th>
+//                 <th class="px-3 py-2 text-left">Created</th>
+//                 <th class="px-3 py-2 text-left">Updated</th>
+//                 <th class="px-3 py-2 text-left">Handled By</th>
+//                 <th class="px-3 py-2 text-left">SIM Number</th>
+//               </tr>
+//             </thead>
+//             <tbody id="usersTableBody" class="divide-y divide-gray-100">
+//               ${users.length
+//                 ? users.map(u => `
+//                   <tr class="hover:bg-gray-50">
+//                     <td class="px-3 py-2">${u.user_id}</td>
+//                     <td class="px-3 py-2">${u.name}</td>
+//                     <td class="px-3 py-2">${u.branch || "-"}</td>
+//                     <td class="px-3 py-2">${u.office_number || "-"}</td>
+//                     <td class="px-3 py-2">${u.department || "-"}</td>
+//                     <td class="px-3 py-2">${u.biometric_id}</td>
+//                     <td class="px-3 py-2">${u.official_email}</td>
+//                     <td class="px-3 py-2">${u.phone_number || "-"}</td>
+//                     <td class="px-3 py-2">${u.status}</td>
+//                     <td class="px-3 py-2">${u.created_at ? new Date(u.created_at).toLocaleDateString() : "-"}</td>
+//                     <td class="px-3 py-2">${u.updated_at ? new Date(u.updated_at).toLocaleDateString() : "-"}</td>
+//                     <td class="px-3 py-2">${u.handled_by_admin || "-"}</td>
+//                     <td class="px-3 py-2">${u.phone_number || "Not Assigned"}</td>
+//                   </tr>
+//                 `).join("")
+//                 : `<tr><td colspan="13" class="text-center py-6 text-gray-500">No users found</td></tr>`}
+//             </tbody>
+//           </table>
+//         </div>
+
+//         <!-- Pagination -->
+//         <div class="flex justify-between items-center mt-6">
+//           <button 
+//             id="prevPageBtn" 
+//             class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 ${page === 1 ? "opacity-50 cursor-not-allowed" : ""}"
+//             ${page === 1 ? "disabled" : ""}
+//           >Prev</button>
+//           <span class="text-gray-700">Page ${page} of ${Math.ceil(total / limit) || 1}</span>
+//           <button 
+//             id="nextPageBtn" 
+//             class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 ${page >= Math.ceil(total / limit) ? "opacity-50 cursor-not-allowed" : ""}"
+//             ${page >= Math.ceil(total / limit) ? "disabled" : ""}
+//           >Next</button>
+//         </div>
+//       </div>
+//     `;
+//   }
+
+//   // ---------------- Fetch Users ----------------
+//   async function fetchUsers(targetId = "usersSection") {
+//     const container = document.getElementById(targetId);
+//     const token = localStorage.getItem("token");
+
+//     if (!container) return;
+
+//     if (!token) {
+//       container.innerHTML = `<div class="p-4 text-center text-red-600 font-bold">Please login to view users.</div>`;
+//       return;
+//     }
+
+//     try {
+//       const query = new URLSearchParams({
+//         page,
+//         limit,
+//         search: search.trim(),
+//         active: filterActive ? "true" : "false",
+//         department: filterDept
+//       });
+
+//       const res = await fetch(`/users?${query}`, {
+//         headers: { "Authorization": `Bearer ${token}` }
+//       });
+
+//       if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch users");
+
+//       const data = await res.json();
+//       users = data?.users || [];
+//       total = data?.total || 0;
+
+//       container.innerHTML = render();
+//       attachListeners(targetId);
+
+//     } catch (err) {
+//       console.error("Error loading users:", err);
+//       container.innerHTML = `<p class="text-red-600">Error: ${err.message}</p>`;
+//     }
+//   }
+
+//   // ---------------- Attach Event Listeners ----------------
+//   function attachListeners(targetId) {
+//     const container = document.getElementById(targetId);
+//     if (!container) return;
+
+//     const searchInput = container.querySelector("#searchInput");
+//     const searchBtn = container.querySelector("#searchBtn");
+//     const prevBtn = container.querySelector("#prevPageBtn");
+//     const nextBtn = container.querySelector("#nextPageBtn");
+//     const totalPages = Math.ceil(total / limit) || 1;
+
+//     // Search
+//     searchInput?.addEventListener("keydown", e => {
+//       if (e.key === "Enter") {
+//         search = searchInput.value;
+//         page = 1;
+//         fetchUsers(targetId);
+//       }
+//     });
+//     searchBtn?.addEventListener("click", () => {
+//       search = searchInput.value;
+//       page = 1;
+//       fetchUsers(targetId);
+//     });
+
+//     // Filters
+//     container.querySelector("#activeFilter")?.addEventListener("change", e => {
+//       filterActive = e.target.checked;
+//       page = 1;
+//       fetchUsers(targetId);
+//     });
+//     container.querySelector("#deptFilter")?.addEventListener("change", e => {
+//       filterDept = e.target.value;
+//       page = 1;
+//       fetchUsers(targetId);
+//     });
+
+//     // Pagination
+//     prevBtn?.addEventListener("click", () => {
+//       if (page > 1) {
+//         page--;
+//         fetchUsers(targetId);
+//       }
+//     });
+//     nextBtn?.addEventListener("click", () => {
+//       if (page < totalPages) {
+//         page++;
+//         fetchUsers(targetId);
+//       }
+//     });
+//   }
+
+//   return { render, load: fetchUsers, fetchUsers };
+// })();
+
+    
+
+
+
+// ---------------- PostUserComponent Singleton ----------------
+
+/* ---------------- USERS COMPONENT (Singleton) ---------------- */
 const UsersComponent = (() => {
   // ---------------- State ----------------
   let users = [];
@@ -294,20 +501,19 @@ const UsersComponent = (() => {
     `;
   }
 
-  // ---------------- Fetch Users ----------------
-  async function fetchUsers(targetId = "usersSection") {
+  // ---------------- Fetch Users (GET /users) ----------------
+  const fetchUsers = async (targetId = "usersSection") => {
     const container = document.getElementById(targetId);
-    const token = localStorage.getItem("token");
-
     if (!container) return;
 
+    const token = localStorage.getItem("token");
     if (!token) {
       container.innerHTML = `<div class="p-4 text-center text-red-600 font-bold">Please login to view users.</div>`;
       return;
     }
 
     try {
-      const query = new URLSearchParams({
+      const params = new URLSearchParams({
         page,
         limit,
         search: search.trim(),
@@ -315,15 +521,15 @@ const UsersComponent = (() => {
         department: filterDept
       });
 
-      const res = await fetch(`/users?${query}`, {
+      const res = await fetch(`/users?${params.toString()}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
 
       if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch users");
 
       const data = await res.json();
-      users = data?.users || [];
-      total = data?.total || 0;
+      users = data.users || [];
+      total = data.total || 0;
 
       container.innerHTML = render();
       attachListeners(targetId);
@@ -332,10 +538,10 @@ const UsersComponent = (() => {
       console.error("Error loading users:", err);
       container.innerHTML = `<p class="text-red-600">Error: ${err.message}</p>`;
     }
-  }
+  };
 
   // ---------------- Attach Event Listeners ----------------
-  function attachListeners(targetId) {
+  const attachListeners = (targetId) => {
     const container = document.getElementById(targetId);
     if (!container) return;
 
@@ -343,6 +549,7 @@ const UsersComponent = (() => {
     const searchBtn = container.querySelector("#searchBtn");
     const prevBtn = container.querySelector("#prevPageBtn");
     const nextBtn = container.querySelector("#nextPageBtn");
+
     const totalPages = Math.ceil(total / limit) || 1;
 
     // Search
@@ -384,16 +591,13 @@ const UsersComponent = (() => {
         fetchUsers(targetId);
       }
     });
-  }
+  };
 
-  return { render, load: fetchUsers, fetchUsers };
+  // ---------------- Public API ----------------
+  return { load: fetchUsers, fetchUsers };
 })();
 
-    
 
-
-
-// ---------------- PostUserComponent Singleton ----------------
 /* ---------------- ADD NEW USER COMPONENT ---------------- */
 /* ---------------- ADD USER COMPONENT (Singleton) ---------------- */
 /* ---------------- ADD NEW USER COMPONENT ---------------- */

@@ -64,8 +64,52 @@
       });
     }
 
-    /* ---------------- DASHBOARD COMPONENT ---------------- */
-function DashboardComponent() {
+
+    ///////////
+  /* ---------------- PROTECTED COMPONENT ---------------- */
+const ProtectedComponent = (() => {
+  let loginMessage = "Please login to view this content.";
+
+  // Optional: custom login message
+  function setLoginMessage(msg) {
+    loginMessage = msg;
+  }
+
+  // Render a component into a container by ID
+  function render(sectionId, component) {
+    const token = localStorage.getItem("token");
+    const container = document.getElementById(sectionId);
+    if (!container) return;
+
+    if (!token) {
+      container.innerHTML = `
+        <div class="p-4 text-center text-red-600 font-bold">
+          ${loginMessage}
+        </div>
+      `;
+      return;
+    }
+
+    // Render the passed component
+    if (component && typeof component.render === "function") {
+      container.innerHTML = component.render();
+    }
+  }
+
+  // Load event listeners / fetch data for a specific component
+  async function load(sectionId, component) {
+    const token = localStorage.getItem("token");
+    const container = document.getElementById(sectionId);
+    if (!container || !token) return;
+
+    if (component && typeof component.load === "function") {
+      await component.load();
+    }
+  }
+
+  return { setLoginMessage, render, load };
+})();/* ---------------- DASHBOARD COMPONENT ---------------- */
+async function DashboardComponent() {
   app.innerHTML = `
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-3xl font-bold text-gray-800">Acolyte Admin Dashboard</h1>
@@ -73,336 +117,255 @@ function DashboardComponent() {
     </div>
 
     <div id="dashboardSections">
-      ${UsersComponent.render()}
-      ${ActiveUsersComponent().render()}
-    ${AddUserComponent.render()}
-      ${SimsComponent.render()}
-      ${AddSimComponent.render()}
-      
-      ${AssignSimComponent().render()}
-      
-    ${ExitUserComponent.render()}
-    ${ExitLogComponent .render()}
-      
+      <div id="usersSection"></div>
+      <div id="addUserSection"></div>
+      <div id="simsSection"></div>
+      <div id="addSimSection"></div>
+      <div id="assignSimSection"></div>
+      <div id="exitUserSection"></div>
+      <div id="exitLogSection"></div>
     </div>
   `;
 
-  // Logout
-  document.getElementById("logoutBtn").addEventListener("click", () => {
+  // Logout button
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      localStorage.removeItem("token");
+      LoginComponent();
+    });
+  }
+
+  // ---------------- Protected sections ----------------
+  const sections = [
+    { id: "usersSection", component: UsersComponent },
+    { id: "addUserSection", component: AddUserComponent },
+    { id: "simsSection", component: SimsComponent },
+    { id: "addSimSection", component: AddSimComponent },
+    { id: "assignSimSection", component: AssignSimComponent },
+    { id: "exitUserSection", component: ExitUserComponent },
+    { id: "exitLogSection", component: ExitLogComponent }
+  ];
+
+  // Use for..of to handle async properly
+  for (const sec of sections) {
+    ProtectedComponent.render(sec.id, sec.component); // render per section
+    await ProtectedComponent.load(sec.id, sec.component); // load per section
+  }
+}
+/* ---------------- DASHBOARD COMPONENT ENDS ---------------- */
+
+
+
+/* ---------------- INIT ---------------- */
+async function init() {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    LoginComponent();
+    return;
+  }
+
+  try {
+    // Verify token with lightweight endpoint
+    const res = await fetch("/users/max-bio", {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error("Token invalid");
+
+    DashboardComponent();
+  } catch (err) {
+    console.warn("Token invalid, redirecting to login", err);
     localStorage.removeItem("token");
     LoginComponent();
-  });
-
-  // Load components
-  UsersComponent.load();
-  ActiveUsersComponent().load();
-  AddUserComponent.load();
-  SimsComponent.load();
-  AddSimComponent.load();
-  ExitUserComponent.load();
-  
-  AssignSimComponent().load();
-  //SwapSimComponent().load();
-  ExitLogComponent.load();
-  
-  
+  }
 }
+
+init();
+
 
     /* ---------------- DASHBOARD COMPONENT ENDS---------------- */
 
-
-
-/* ---------------- USERS COMPONENT ---------------- */
 /* ---------------- USERS COMPONENT (Singleton) ---------------- */
-// -
-// ---------------- USERS COMPONENT ----------------
-// ---------------- USERS COMPONENT ----------------
+
+/* ---------------- USERS COMPONENT (Singleton) ---------------- */
 const UsersComponent = (() => {
-  return {
-    state: {
-      allUsersData: [],
-      currentPage: 1,
-      limit: 10,
-      totalPages: 1
-    },
+  // ---------------- State ----------------
+  let users = [];
+  let page = 1;
+  const limit = 10;
+  let total = 0;
+  let search = "";
+  let filterActive = true;
+  let filterDept = "";
 
-    // Render UI
-    render: () => `
-      <div class="bg-white p-6 rounded-xl shadow mb-6">
-        <h2 class="text-xl font-bold mb-4">Users</h2>
+  // ---------------- Render HTML ----------------
+  function render() {
+    const totalPages = Math.ceil(total / limit) || 1;
 
-        <!-- Search Bar + Page Size -->
-        <div class="mb-4 flex justify-between items-center">
-          <div class="flex space-x-2">
-            <input type="text" id="searchInput" placeholder="Search users"
-              class="p-2 border rounded w-64 shadow-sm focus:ring focus:ring-green-300"
-              onkeydown="if(event.key==='Enter'){ UsersComponent.search() }"
-              aria-label="Search users">
-            <button onclick="UsersComponent.search()"
-              class="px-4 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700">
-              Search
-            </button>
-          </div>
+    return `
+      <div class="p-4">
+        <h2 class="text-2xl font-bold mb-4">Users</h2>
 
-          <div class="flex items-center space-x-2">
-            <label for="pageSize" class="sr-only">Select page size</label>
-            <select id="pageSize" onchange="UsersComponent.changePageSize()"
-              class="border p-2 rounded shadow-sm">
-              <option value="10" selected>10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Table -->
-        <div class="overflow-x-auto">
-          <table class="min-w-full border rounded-lg text-sm text-gray-700">
-            <thead class="bg-gray-800 text-white">
-              <tr>
-                <th class="px-4 py-2">User ID</th>
-                <th class="px-4 py-2">Name</th>
-                <th class="px-4 py-2">Branch</th>
-                <th class="px-4 py-2">Office Number</th>
-                <th class="px-4 py-2">Department</th>
-                <th class="px-4 py-2">Biometric ID</th>
-                <th class="px-4 py-2">Official Email</th>
-                <th class="px-4 py-2">Phone Number</th>
-                <th class="px-4 py-2">Status</th>
-                <th class="px-4 py-2">Created</th>
-                <th class="px-4 py-2">Updated</th>
-                <th class="px-4 py-2">Handled By</th>
-              </tr>
-            </thead>
-            <tbody id="usersTableBody"></tbody>
-          </table>
-        </div>
-
-        <!-- Pagination -->
-        <div class="flex justify-between items-center mt-4">
-          <button id="prevBtn" onclick="UsersComponent.prevPage()"
-            class="px-3 py-1 bg-gray-600 text-white rounded-xl shadow hover:bg-gray-700">
-            Prev
-          </button>
-          <span id="pageInfo" class="text-gray-700 font-medium"></span>
-          <button id="nextBtn" onclick="UsersComponent.nextPage()"
-            class="px-3 py-1 bg-gray-600 text-white rounded-xl shadow hover:bg-gray-700">
-            Next
-          </button>
-          <select id="pageSizeBottom" onchange="UsersComponent.changePageSize()"
-            class="border p-2 rounded shadow-sm ml-4">
-            <option value="10" selected>10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
+        <!-- Search + Filters -->
+        <div class="flex gap-4 mb-4 flex-wrap items-center">
+          <input type="text" id="searchInput" placeholder="Search users..."
+                 class="border p-2 flex-1 min-w-[200px]" value="${search}" />
+          <button id="searchBtn" class="px-3 py-2 bg-blue-600 text-white rounded">Search</button>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="activeFilter" ${filterActive ? "checked" : ""} /> Show Active Only
+          </label>
+          <select id="deptFilter" class="border p-2">
+            <option value="">All Departments</option>
+            <option value="IT" ${filterDept === "IT" ? "selected" : ""}>IT</option>
+            <option value="HR" ${filterDept === "HR" ? "selected" : ""}>HR</option>
+            <option value="Finance" ${filterDept === "Finance" ? "selected" : ""}>Finance</option>
+            <option value="Admin" ${filterDept === "Admin" ? "selected" : ""}>Admin</option>
           </select>
         </div>
+
+        <!-- Users Table -->
+        <table class="min-w-full border">
+          <thead>
+            <tr class="bg-gray-100">
+              <th>User ID</th><th>Name</th><th>Branch</th><th>Office No.</th><th>Department</th>
+              <th>Biometric ID</th><th>Email</th><th>Phone</th><th>Status</th><th>Created</th>
+              <th>Updated</th><th>Handled By</th><th>SIM Number</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody">
+            ${users.length
+              ? users.map(u => `
+                <tr>
+                  <td>${u.user_id}</td>
+                  <td>${u.name}</td>
+                  <td>${u.branch || "-"}</td>
+                  <td>${u.office_number || "-"}</td>
+                  <td>${u.department || "-"}</td>
+                  <td>${u.biometric_id}</td>
+                  <td>${u.official_email}</td>
+                  <td>${u.phone_number || "-"}</td>
+                  <td>${u.status}</td>
+                  <td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : "-"}</td>
+                  <td>${u.updated_at ? new Date(u.updated_at).toLocaleDateString() : "-"}</td>
+                  <td>${u.handled_by_admin || "-"}</td>
+                  <td>${u.sim_number || "Not Assigned"}</td>
+                </tr>
+              `).join("")
+              : `<tr><td colspan="13" class="text-center py-4">No users found</td></tr>`}
+          </tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div class="flex justify-between mt-4">
+          <button id="prevPageBtn" class="px-4 py-2 bg-gray-300 rounded ${page === 1 ? "opacity-50" : ""}" ${page === 1 ? "disabled" : ""}>Prev</button>
+          <span>Page ${page} of ${totalPages}</span>
+          <button id="nextPageBtn" class="px-4 py-2 bg-gray-300 rounded ${page >= totalPages ? "opacity-50" : ""}" ${page >= totalPages ? "disabled" : ""}>Next</button>
+        </div>
       </div>
-    `,
+       <p class="text-gray-500 text-sm mt-2">
+            ⚠️ Don't search with Phone numbers.
+          </p>
+    `;
+  }
 
-    // Load initial data
-    load: async () => {
-      await UsersComponent.fetchUsers();
-    },
+  // ---------------- Fetch Users ----------------
+  async function fetchUsers(targetId = "usersSection") {
+    const container = document.getElementById(targetId);
+    const token = localStorage.getItem("token");
 
-    // Fetch users from API
-    fetchUsers: async (page = 1) => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/users?page=${page}&limit=${UsersComponent.state.limit}`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        const data = await res.json();
+    if (!container) return;
 
-        UsersComponent.state.allUsersData = data.users;
-        UsersComponent.state.currentPage = data.page;
-        UsersComponent.state.totalPages = data.totalPages;
-
-        UsersComponent.populateTable(data.users);
-        UsersComponent.updatePaginationControls();
-      } catch (err) {
-        console.error("Fetch Users Failed:", err);
-        const tableBody = document.getElementById("usersTableBody");
-        if (tableBody) tableBody.innerHTML = `<tr><td colspan="12" class="text-center py-3 text-red-600">Error loading users</td></tr>`;
-      }
-    },
-
-    // Search across all columns (numeric fields safely converted to string)
-    search: () => {
-      const input = document.getElementById("searchInput");
-      if (!input) return;
-
-      const query = input.value.trim().toLowerCase();
-      if (!query) {
-        UsersComponent.populateTable(UsersComponent.state.allUsersData);
-        return;
-      }
-
-      const filtered = UsersComponent.state.allUsersData.filter(u =>
-        (u.user_id?.toString().toLowerCase().includes(query)) ||
-        (u.name?.toString().toLowerCase().includes(query)) ||
-        (u.branch?.toString().toLowerCase().includes(query)) ||
-        (u.office_number?.toString().toLowerCase().includes(query)) ||
-        (u.department?.toString().toLowerCase().includes(query)) ||
-        (u.biometric_id?.toString().toLowerCase().includes(query)) ||
-        (u.official_email?.toString().toLowerCase().includes(query)) ||
-        (u.phone_number?.toString().toLowerCase().includes(query)) ||
-        (u.status?.toString().toLowerCase().includes(query)) ||
-        (u.created_at?.toString().toLowerCase().includes(query)) ||
-        (u.updated_at?.toString().toLowerCase().includes(query)) ||
-        (u.handled_by_admin?.toString().toLowerCase().includes(query))
-      );
-
-      UsersComponent.populateTable(filtered);
-    },
-
-    // Populate table
-    populateTable: (users) => {
-      const tableBody = document.getElementById("usersTableBody");
-      tableBody.innerHTML = "";
-      if (!users || users.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="12" class="text-center py-3">No users found</td></tr>`;
-        return;
-      }
-
-      users.forEach(u => {
-        tableBody.insertAdjacentHTML("beforeend", `
-          <tr>
-            <td class="px-4 py-3">${u.user_id || "-"}</td>
-            <td class="px-4 py-3 font-medium text-gray-900">${u.name || "-"}</td>
-            <td class="px-4 py-3">${u.branch || "-"}</td>
-            <td class="px-4 py-3">${u.office_number || "-"}</td>
-            <td class="px-4 py-3">${u.department || "-"}</td>
-            <td class="px-4 py-3">${u.biometric_id || "-"}</td>
-            <td class="px-4 py-3">${u.official_email || "-"}</td>
-            <td class="px-4 py-3">${u.phone_number || "-"}</td>
-            <td class="px-4 py-3">
-              <span class="px-2 py-1 text-xs font-semibold rounded-full ${u.status==='inactive'?'bg-red-100 text-red-600':'bg-green-100 text-green-600'}">
-                ${u.status || "Active"}
-              </span>
-            </td>
-            <td class="px-4 py-3">${u.created_at?.split("T")[0] || "-"}</td>
-            <td class="px-4 py-3">${u.updated_at?.split("T")[0] || "-"}</td>
-            <td class="px-4 py-3">${u.handled_by_admin || "-"}</td>
-          </tr>
-        `);
-      });
-    },
-
-    // Pagination controls
-    prevPage: () => {
-      if (UsersComponent.state.currentPage > 1) {
-        UsersComponent.fetchUsers(UsersComponent.state.currentPage - 1);
-      }
-    },
-    nextPage: () => {
-      if (UsersComponent.state.currentPage < UsersComponent.state.totalPages) {
-        UsersComponent.fetchUsers(UsersComponent.state.currentPage + 1);
-      }
-    },
-    updatePaginationControls: () => {
-      document.getElementById("pageInfo").textContent =
-        `Page ${UsersComponent.state.currentPage} of ${UsersComponent.state.totalPages}`;
-      document.getElementById("prevBtn").disabled = UsersComponent.state.currentPage === 1;
-      document.getElementById("nextBtn").disabled = UsersComponent.state.currentPage === UsersComponent.state.totalPages;
-    },
-
-    // Change page size and sync both selects
-    changePageSize: () => {
-      const top = parseInt(document.getElementById("pageSize").value);
-      const bottom = parseInt(document.getElementById("pageSizeBottom").value);
-      const size = top || bottom;
-
-      UsersComponent.state.limit = size;
-      UsersComponent.fetchUsers(1);
-
-      // Keep both selects in sync
-      document.getElementById("pageSize").value = size;
-      document.getElementById("pageSizeBottom").value = size;
+    if (!token) {
+      container.innerHTML = `<div class="p-4 text-center text-red-600 font-bold">Please login to view users.</div>`;
+      return;
     }
-  };
+
+    try {
+      const query = new URLSearchParams({
+        page,
+        limit,
+        search: search.trim(),
+        active: filterActive ? "true" : "false",
+        department: filterDept
+      });
+
+      const res = await fetch(`/users?${query}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch users");
+
+      const data = await res.json();
+      users = data?.users || [];
+      total = data?.total || 0;
+
+      container.innerHTML = render();
+      attachListeners(targetId);
+
+    } catch (err) {
+      console.error("Error loading users:", err);
+      container.innerHTML = `<p class="text-red-600">Error: ${err.message}</p>`;
+    }
+  }
+
+  // ---------------- Attach Event Listeners ----------------
+  function attachListeners(targetId) {
+    const container = document.getElementById(targetId);
+    if (!container) return;
+
+    const searchInput = container.querySelector("#searchInput");
+    const searchBtn = container.querySelector("#searchBtn");
+    const prevBtn = container.querySelector("#prevPageBtn");
+    const nextBtn = container.querySelector("#nextPageBtn");
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    // Search
+    searchInput?.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        search = searchInput.value;
+        page = 1;
+        fetchUsers(targetId);
+      }
+    });
+    searchBtn?.addEventListener("click", () => {
+      search = searchInput.value;
+      page = 1;
+      fetchUsers(targetId);
+    });
+
+    // Filters
+    container.querySelector("#activeFilter")?.addEventListener("change", e => {
+      filterActive = e.target.checked;
+      page = 1;
+      fetchUsers(targetId);
+    });
+    container.querySelector("#deptFilter")?.addEventListener("change", e => {
+      filterDept = e.target.value;
+      page = 1;
+      fetchUsers(targetId);
+    });
+
+    // Pagination
+    prevBtn?.addEventListener("click", () => {
+      if (page > 1) {
+        page--;
+        fetchUsers(targetId);
+      }
+    });
+    nextBtn?.addEventListener("click", () => {
+      if (page < totalPages) {
+        page++;
+        fetchUsers(targetId);
+      }
+    });
+  }
+
+  return { render, load: fetchUsers, fetchUsers };
 })();
 
 
 
-
-
-
-
-
-    /* ---------------- USERS COMPONENT ---------------- */
-    
-    
-
-
-
-/* ---------------- ACTIVE USERS COMPONENT ---------------- */
-function ActiveUsersComponent() {
-  return {
-    render: () => `
-      <section class="mb-10">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">Active Users</h2>
-        <button id="loadActiveUsersBtn"
-          class="mb-4 px-6 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700">
-          Get Active Users
-        </button>
-        <div class="overflow-x-auto bg-white shadow rounded-lg">
-          <table class="w-full text-sm text-left text-gray-600">
-            <thead class="bg-gray-800 text-white">
-              <tr>
-                <th class="px-4 py-3">ID</th>
-                <th class="px-4 py-3">Name</th>
-                <th class="px-4 py-3">Phone</th>
-                <th class="px-4 py-3">Department</th>
-                <th class="px-4 py-3">Biometric ID</th>
-                <th class="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody id="activeUsersBody"></tbody>
-          </table>
-        </div>
-      </section>
-    `,
-
-    load: () => {
-      document.getElementById("loadActiveUsersBtn").addEventListener("click", () => {
-        ActiveUsersComponent().fetchActiveUsers();
-      });
-    },
-
-    fetchActiveUsers: async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch("/users/active", {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        const data = await res.json();
-        ActiveUsersComponent().populateTable(data);
-      } catch (err) {
-        console.error("Fetch Active Users Failed:", err);
-      }
-    },
-
-    populateTable: (users) => {
-      const tbody = document.getElementById("activeUsersBody");
-      tbody.innerHTML = "";
-      users.forEach(u => {
-        tbody.innerHTML += `
-          <tr>
-            <td class="px-4 py-3">${u.user_id}</td>
-            <td class="px-4 py-3">${u.name}</td>
-            <td class="px-4 py-3">${u.phone_number}</td>
-            <td class="px-4 py-3">${u.department}</td>
-            <td class="px-4 py-3">${u.biometric_id}</td>
-            <td class="px-4 py-3 text-green-600 font-semibold">Active</td>
-          </tr>
-        `;
-      });
-    }
-  };
-}
-
-
-    /* ---------------- ACTIVE USERS COMPONENT ENDS---------------- */
     
 
 
@@ -410,43 +373,51 @@ function ActiveUsersComponent() {
 // ---------------- PostUserComponent Singleton ----------------
 /* ---------------- ADD NEW USER COMPONENT ---------------- */
 /* ---------------- ADD USER COMPONENT ---------------- */
-
+/* ---------------- ADD NEW USER COMPONENT ---------------- */
 const AddUserComponent = (() => {
   return {
     state: {},
 
     render: () => `
       <section class="mb-6">
-        <h2 class="text-xl font-semibold mb-4">Add New User</h2>
+        <h2 class="text-xl font-semibold mb-4">Add New User(s)</h2>
 
         <form id="addUserForm" class="space-y-3 bg-white p-4 rounded shadow">
           <div>
-            <label class="block font-semibold mb-1">Name:</label>
-            <input type="text" id="name" class="p-2 border rounded w-1/2" required>
+            <label class="block font-semibold mb-1">Name(s) (comma separated):</label>
+            <input type="text" id="names" placeholder="e.g. John Doe, Jane Smith"
+                   class="p-2 border rounded w-1/2" required>
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Branch:</label>
-            <input type="text" id="branch" class="p-2 border rounded w-1/2" required>
+            <label class="block font-semibold mb-1">Official Email(s) (comma separated):</label>
+            <input type="text" id="emails" placeholder="e.g. john@company.com,jane@company.com"
+                   class="p-2 border rounded w-1/2" required>
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Department:</label>
-            <input type="text" id="department" class="p-2 border rounded w-1/2">
+            <label class="block font-semibold mb-1">Branch (optional, comma separated):</label>
+            <input type="text" id="branches" placeholder="e.g. Jaipur, Delhi"
+                   class="p-2 border rounded w-1/2">
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Office Number:</label>
-            <input type="text" id="office_number" class="p-2 border rounded w-1/2">
+            <label class="block font-semibold mb-1">Office Number (optional, comma separated):</label>
+            <input type="text" id="officeNumbers" placeholder="e.g. 101,102"
+                   class="p-2 border rounded w-1/2">
           </div>
 
           <div>
-            <label class="block font-semibold mb-1">Official Email:</label>
-            <input type="email" id="official_email" class="p-2 border rounded w-1/2">
+            <label class="block font-semibold mb-1">Department (optional, comma separated):</label>
+            <input type="text" id="departments" placeholder="e.g. HR, IT"
+                   class="p-2 border rounded w-1/2">
           </div>
 
-          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-            Add User
+         
+
+          <button type="submit"
+                  class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+            Add User(s)
           </button>
         </form>
 
@@ -459,62 +430,75 @@ const AddUserComponent = (() => {
       if (form) {
         form.addEventListener("submit", async (e) => {
           e.preventDefault();
-          await AddUserComponent.addUser();
+          await AddUserComponent.addUsers();
         });
       }
     },
 
-    addUser: async () => {
-      const msgDiv = document.getElementById("addUserMsg");
-      const name = document.getElementById("name").value.trim();
-      const branch = document.getElementById("branch").value.trim();
-      const department = document.getElementById("department").value.trim();
-      const office_number = document.getElementById("office_number").value.trim();
-      const official_email = document.getElementById("official_email").value.trim();
+    addUsers: async () => {
+      const names = document.getElementById("names").value.trim().split(",").map(s => s.trim());
+      const emails = document.getElementById("emails").value.trim().split(",").map(s => s.trim());
+      const branches = document.getElementById("branches").value.trim().split(",").map(s => s.trim());
+      const officeNumbers = document.getElementById("officeNumbers").value.trim().split(",").map(s => s.trim());
+      const departments = document.getElementById("departments").value.trim().split(",").map(s => s.trim());
 
-      if (!name || !branch) {
-        msgDiv.textContent = "Name and Branch are required!";
+      const msgDiv = document.getElementById("addUserMsg");
+
+      if (!names.length || !emails.length) {
+        msgDiv.textContent = "Name and Email are required for all users!";
         msgDiv.className = "text-red-600 mt-2 font-medium";
         return;
       }
 
+      if (names.length !== emails.length) {
+        msgDiv.textContent = "Names and Emails count must match!";
+        msgDiv.className = "text-red-600 mt-2 font-medium";
+        return;
+      }
+
+      // Prepare payload (no biometric_id, handled by backend)
+      const payload = names.map((name, idx) => ({
+        name,
+        official_email: emails[idx],
+        branch: branches[idx] || null,
+        office_number: officeNumbers[idx] || null,
+        department: departments[idx] || null
+      }));
+
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("/users", {
+        const res = await fetch("/users/bulk", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
           },
-          body: JSON.stringify({ name, branch, department, office_number, official_email })
+          body: JSON.stringify({ users: payload })
         });
 
         const data = await res.json();
-
         if (!res.ok) {
-          msgDiv.textContent = data.error || "Failed to add user";
+          msgDiv.textContent = data.error || "Failed to add users";
           msgDiv.className = "text-red-600 mt-2 font-medium";
           return;
         }
 
-        msgDiv.textContent = `✅ User ${data.name} created successfully with Biometric ID ${data.biometric_id}, Handled by: ${data.handled_by_admin}`;
+        msgDiv.textContent = `${data.insertedCount} user(s) added successfully! Handled by: ${data.handled_by_admin}`;
         msgDiv.className = "text-green-600 mt-2 font-medium";
 
-        // Reset form
         document.getElementById("addUserForm").reset();
 
-        // Optionally refresh users table if exists
+        // Refresh UsersComponent table (if exists)
         if (typeof UsersComponent !== "undefined") UsersComponent.fetchUsers();
 
       } catch (err) {
-        console.error("Add User Failed:", err);
-        msgDiv.textContent = "Server error while adding user";
+        console.error("Add users failed:", err);
+        msgDiv.textContent = "Server error while adding users";
         msgDiv.className = "text-red-600 mt-2 font-medium";
       }
     }
   };
 })();
-
 
 
     
@@ -532,24 +516,31 @@ const SimsComponent = (() => {
     const end = start + state.limit;
     const pageData = state.filteredData.slice(start, end);
 
-    pageData.forEach(sim => {
-      tbody.insertAdjacentHTML("beforeend", `
-        <tr>
-          <td class="px-4 py-3">${sim.sim_id || '-'}</td>
-          <td class="px-4 py-3">${sim.phone_number || '-'}</td>
-          <td class="px-4 py-3">${sim.provider || '-'}</td>
-          <td class="px-4 py-3">
-            <span class="px-2 py-1 text-xs font-semibold rounded-full ${sim.status==='assigned'?'bg-green-100 text-green-600':'bg-yellow-100 text-yellow-600'}">
-              ${sim.status || '-'}
-            </span>
-          </td>
-          <td class="px-4 py-3">${sim.assigned_user || '-'}</td>
-          <td class="px-4 py-3">${sim.added_date ? new Date(sim.added_date).toLocaleString() : '-'}</td>
-          <td class="px-4 py-3">${sim.updated_at ? new Date(sim.updated_at).toLocaleString() : '-'}</td>
-          <td class="px-4 py-3">${sim.handled_by_admin || '-'}</td>
-        </tr>
-      `);
-    });
+    
+// Render each row
+
+pageData.forEach(sim => {
+  tbody.insertAdjacentHTML("beforeend", `
+  <thead class="bg-gray-800 text-white">
+    <tr class="w-full text-sm text-left text-white">
+      <td class="px-4 py-3 text-gray-700 font-medium whitespace-nowrap">${sim.sim_id || '-'}</td>
+      <td class="px-4 py-3 text-gray-700 whitespace-nowrap">${sim.phone_number || '-'}</td>
+      <td class="px-4 py-3 text-gray-700 whitespace-nowrap">${sim.provider || '-'}</td>
+      <td class="px-4 py-3">
+        <span class="px-2 py-1 text-xs font-semibold rounded-full ${sim.status==='assigned' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}">
+          ${sim.status || '-'}
+        </span>
+      </td>
+      <td class="px-4 py-3 text-gray-700 whitespace-nowrap">${sim.assigned_user || '-'}</td>
+      <td class="px-4 py-3 text-gray-700 whitespace-nowrap">${sim.added_date ? new Date(sim.added_date).toLocaleString() : '-'}</td>
+      <td class="px-4 py-3 text-gray-700 whitespace-nowrap">${sim.updated_at ? new Date(sim.updated_at).toLocaleString() : '-'}</td>
+      <td class="px-4 py-3 text-gray-700 whitespace-nowrap">${sim.handled_by_admin || '-'}</td>
+    </tr>
+    </thead>
+  `);
+});
+
+// Update page info
 
     const pageInfo = document.getElementById("simsPageInfo");
     const prevBtn = document.getElementById("prevSimsBtn");
@@ -896,7 +887,7 @@ const AddSimComponent = (() => {
 
     /* ---------------- ASSIGN SIM COMPONENT ---------------- */
     /* ---------------- ASSIGN SIM COMPONENT ---------------- */
-function AssignSimComponent() {
+const AssignSimComponent = (() => {
   return {
     render: () => `
       <section class="mb-6 p-4 bg-white rounded-lg shadow-md">
@@ -909,144 +900,77 @@ function AssignSimComponent() {
           class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
           Assign SIM
         </button>
-        <!-- Message box -->
         <div id="assignSimMessageBox" class="mt-2 text-sm"></div>
       </section>
     `,
 
     load: () => {
       document.addEventListener("click", async (e) => {
-        if (e.target.id === "assignSimBtn") {
-          const biometric_id = parseInt(document.getElementById("assignBiometricId").value);
-          const phone_number = document.getElementById("assignPhoneNumber").value.trim();
-          const messageBox = document.getElementById("assignSimMessageBox");
+        if (e.target.id !== "assignSimBtn") return;
 
-          // Reset message box
-          messageBox.textContent = "";
-          messageBox.className = "mt-2 text-sm";
+        const biometric_id = parseInt(document.getElementById("assignBiometricId").value);
+        const phone_number = document.getElementById("assignPhoneNumber").value.trim();
+        const messageBox = document.getElementById("assignSimMessageBox");
 
-          if (!biometric_id || !phone_number) {
-            messageBox.textContent = "⚠️ Please fill all fields.";
-            messageBox.classList.add("text-yellow-600");
-            return;
+        messageBox.textContent = "";
+        messageBox.className = "mt-2 text-sm";
+
+        if (!biometric_id || !phone_number) {
+          messageBox.textContent = "⚠️ Please fill all fields.";
+          messageBox.classList.add("text-yellow-600");
+          return;
+        }
+
+        const token = localStorage.getItem("token");
+
+        try {
+          let res = await fetch("/assign", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ biometric_id, phone_number })
+          });
+
+          let data = await res.json();
+
+          if (res.status === 409 && data.requireConfirmation) {
+            if (confirm(data.message)) {
+              res = await fetch("/assign", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ biometric_id, phone_number, force: true })
+              });
+              data = await res.json();
+            }
           }
 
-          const token = localStorage.getItem("token");
-
-          try {
-            let res = await fetch("/assign", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-              },
-              body: JSON.stringify({ biometric_id, phone_number })
-            });
-
-            let data = await res.json();
-
-            // If conflict, ask for confirmation
-            if (res.status === 409 && data.requireConfirmation) {
-              if (confirm(data.message)) {
-                res = await fetch("/assign", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                  },
-                  body: JSON.stringify({ biometric_id, phone_number, force: true })
-                });
-                data = await res.json();
-              }
-            }
-
-            if (res.ok) {
-              messageBox.textContent = `✅ ${data.message || "SIM assigned successfully"} by: ${data.handled_by_admin || "Unknown"}`;
-              messageBox.classList.add("text-green-600");
-            } else {
-              messageBox.textContent = `❌ ${data.error || "Failed to assign SIM"}`;
-              messageBox.classList.add("text-red-600");
-            }
-
-            // Clear inputs
-            document.getElementById("assignBiometricId").value = "";
-            document.getElementById("assignPhoneNumber").value = "";
-
-          } catch (err) {
-            console.error(err);
-            messageBox.textContent = "❌ Error assigning SIM";
+          if (res.ok) {
+            messageBox.textContent = `✅ ${data.message || "SIM assigned successfully"} by: ${data.handled_by_admin || "Unknown"}`;
+            messageBox.classList.add("text-green-600");
+          } else {
+            messageBox.textContent = `❌ ${data.error || "Failed to assign SIM"}`;
             messageBox.classList.add("text-red-600");
           }
+
+          document.getElementById("assignBiometricId").value = "";
+          document.getElementById("assignPhoneNumber").value = "";
+
+        } catch (err) {
+          console.error(err);
+          messageBox.textContent = "❌ Error assigning SIM";
+          messageBox.classList.add("text-red-600");
         }
       });
     }
   };
-}
+})();
 
 
-    /* ---------------- SWAP SIM COMPONENT ---------------- */
- /* ---------------- SWAP SIM COMPONENT ---------------- */
-function SwapSimComponent() {
-  return {
-    render: () => `
-      <section class="mb-6 p-4 bg-white rounded shadow">
-        <h2 class="text-xl font-semibold mb-2">Swap SIM</h2>
-        <input type="number" id="swapBiometricId" placeholder="Biometric ID" class="p-2 border rounded mr-2"/>
-        <input type="number" id="swapSimId" placeholder="New SIM ID" class="p-2 border rounded mr-2"/>
-        <button id="swapSimBtn" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Swap SIM</button>
-        <!-- Message Box for feedback -->
-        <p id="swapMessageBox" class="mt-2 text-sm"></p>
-      </section>
-    `,
-    load: () => {
-      document.addEventListener("click", async (e) => {
-        if (e.target.id === "swapSimBtn") {
-          const biometric_id = parseInt(document.getElementById("swapBiometricId").value);
-          const new_sim_id = parseInt(document.getElementById("swapSimId").value);
-          const messageBox = document.getElementById("swapMessageBox");
-
-          // Validation
-          if (!biometric_id || !new_sim_id) {
-            messageBox.textContent = "⚠️ Please fill all fields";
-            messageBox.className = "mt-2 text-sm text-red-600";
-            return;
-          }
-
-          try {
-            const token = localStorage.getItem("token");
-            const res = await fetch("/swap", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`,
-              },
-              body: JSON.stringify({ biometric_id, new_sim_id }),
-            });
-
-            const data = await res.json();
-
-            if (res.ok) {
-              // ✅ Success message
-              messageBox.textContent = `✅ SIM swapped successfully! Biometric ID: ${biometric_id}, New SIM ID: ${new_sim_id}, by: ${data.handled_by_admin || "Unknown"}`;
-              messageBox.className = "mt-2 text-sm text-green-600";
-            } else {
-              // ❌ Error message
-              messageBox.textContent = `❌ Error: ${data.error || "Swap failed"}`;
-              messageBox.className = "mt-2 text-sm text-red-600";
-            }
-
-            // Reset fields
-            document.getElementById("swapBiometricId").value = "";
-            document.getElementById("swapSimId").value = "";
-          } catch (err) {
-            messageBox.textContent = `⚠️ Request failed: ${err.message}`;
-            messageBox.className = "mt-2 text-sm text-red-600";
-          }
-        }
-      });
-    },
-  };
-}
 
 
 
@@ -1321,16 +1245,7 @@ search: () => {
 
 
 
-    /* ---------------- INIT ---------------- */
-    function init() {
-      if (localStorage.getItem("token")) {
-        DashboardComponent();
-      } else {
-        LoginComponent();
-      }
-    }
 
-    init();
   </script>
 </body>
 </html>

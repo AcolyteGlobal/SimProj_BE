@@ -199,9 +199,6 @@ const UsersComponent = (() => {
   let filterActive = true;
   let filterDept = "";
 
-  // API Base (explicit for CloudPanel / backend calls)
-  const API_BASE = "http://localhost:4000";
-
   // ---------------- Render HTML ----------------
   function render() {
     const totalPages = Math.ceil(total / limit) || 1;
@@ -271,7 +268,7 @@ const UsersComponent = (() => {
                     <td class="px-3 py-2">${u.created_at ? new Date(u.created_at).toLocaleDateString() : "-"}</td>
                     <td class="px-3 py-2">${u.updated_at ? new Date(u.updated_at).toLocaleDateString() : "-"}</td>
                     <td class="px-3 py-2">${u.handled_by_admin || "-"}</td>
-                    <td class="px-3 py-2">${u.sim_number || "Not Assigned"}</td>
+                    <td class="px-3 py-2">${u.phone_number || "Not Assigned"}</td>
                   </tr>
                 `).join("")
                 : `<tr><td colspan="13" class="text-center py-6 text-gray-500">No users found</td></tr>`}
@@ -286,17 +283,13 @@ const UsersComponent = (() => {
             class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 ${page === 1 ? "opacity-50 cursor-not-allowed" : ""}"
             ${page === 1 ? "disabled" : ""}
           >Prev</button>
-          <span class="text-gray-700">Page ${page} of ${totalPages}</span>
+          <span class="text-gray-700">Page ${page} of ${Math.ceil(total / limit) || 1}</span>
           <button 
             id="nextPageBtn" 
-            class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 ${page >= totalPages ? "opacity-50 cursor-not-allowed" : ""}"
-            ${page >= totalPages ? "disabled" : ""}
+            class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 ${page >= Math.ceil(total / limit) ? "opacity-50 cursor-not-allowed" : ""}"
+            ${page >= Math.ceil(total / limit) ? "disabled" : ""}
           >Next</button>
         </div>
-
-        <p class="text-gray-500 text-sm mt-4">
-          ⚠️ Don’t search with Phone numbers.
-        </p>
       </div>
     `;
   }
@@ -322,7 +315,7 @@ const UsersComponent = (() => {
         department: filterDept
       });
 
-      const res = await fetch(`${API_BASE}/users?${query}`, {
+      const res = await fetch(`/users?${query}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
 
@@ -396,7 +389,6 @@ const UsersComponent = (() => {
   return { render, load: fetchUsers, fetchUsers };
 })();
 
-
     
 
 
@@ -404,79 +396,132 @@ const UsersComponent = (() => {
 // ---------------- PostUserComponent Singleton ----------------
 /* ---------------- ADD NEW USER COMPONENT ---------------- */
 /* ---------------- ADD USER COMPONENT (Singleton) ---------------- */
+/* ---------------- ADD NEW USER COMPONENT ---------------- */
 const AddUserComponent = (() => {
-  const API_BASE = "http://localhost:4000"; // ✅ Backend base URL
+  return {
+    state: {},
 
-  // ---------------- Render Form ----------------
-  function render() {
-    return `
-      <div class="p-4">
-        <h2 class="text-2xl font-bold mb-4">Add Users</h2>
-        <textarea id="bulkUsersInput" 
-          placeholder="Paste JSON array of users here..." 
-          class="w-full border p-2 rounded h-40"></textarea>
-        
-        <button id="bulkAddBtn" 
-          class="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-          Add Users
-        </button>
-        
-        <div id="bulkAddResult" class="mt-3 text-sm"></div>
-      </div>
-    `;
-  }
+    render: () => `
+      <section class="mb-6">
+        <h2 class="text-xl font-semibold mb-4">Add New User(s)</h2>
 
-  // ---------------- Bind Events ----------------
-  function bindEvents() {
-    const addBtn = document.getElementById("bulkAddBtn");
-    const input = document.getElementById("bulkUsersInput");
-    const result = document.getElementById("bulkAddResult");
+        <form id="addUserForm" class="space-y-3 bg-white p-4 rounded shadow">
+          <div>
+            <label class="block font-semibold mb-1">Name(s) (comma separated):</label>
+            <input type="text" id="names" placeholder="e.g. John Doe, Jane Smith"
+                   class="p-2 border rounded w-1/2" required>
+          </div>
 
-    addBtn.addEventListener("click", async () => {
+          <div>
+            <label class="block font-semibold mb-1">Official Email(s) (comma separated):</label>
+            <input type="text" id="emails" placeholder="e.g. john@company.com,jane@company.com"
+                   class="p-2 border rounded w-1/2" required>
+          </div>
+
+          <div>
+            <label class="block font-semibold mb-1">Branch (optional, comma separated):</label>
+            <input type="text" id="branches" placeholder="e.g. Jaipur, Delhi"
+                   class="p-2 border rounded w-1/2">
+          </div>
+
+          <div>
+            <label class="block font-semibold mb-1">Office Number (optional, comma separated):</label>
+            <input type="text" id="officeNumbers" placeholder="e.g. 101,102"
+                   class="p-2 border rounded w-1/2">
+          </div>
+
+          <div>
+            <label class="block font-semibold mb-1">Department (optional, comma separated):</label>
+            <input type="text" id="departments" placeholder="e.g. HR, IT"
+                   class="p-2 border rounded w-1/2">
+          </div>
+
+          <button type="submit"
+                  class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+            Add User(s)
+          </button>
+        </form>
+
+        <div id="addUserMsg" class="mt-3 text-sm font-medium"></div>
+      </section>
+    `,
+
+    load: () => {
+      const form = document.getElementById("addUserForm");
+      if (form) {
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          await AddUserComponent.addUsers();
+        });
+      }
+    },
+
+    addUsers: async () => {
+      const names = document.getElementById("names").value.trim().split(",").map(s => s.trim());
+      const emails = document.getElementById("emails").value.trim().split(",").map(s => s.trim());
+      const branches = document.getElementById("branches").value.trim().split(",").map(s => s.trim());
+      const officeNumbers = document.getElementById("officeNumbers").value.trim().split(",").map(s => s.trim());
+      const departments = document.getElementById("departments").value.trim().split(",").map(s => s.trim());
+
+      const msgDiv = document.getElementById("addUserMsg");
+
+      if (!names.length || !emails.length) {
+        msgDiv.textContent = "Name and Email are required for all users!";
+        msgDiv.className = "text-red-600 mt-2 font-medium";
+        return;
+      }
+
+      if (names.length !== emails.length) {
+        msgDiv.textContent = "Names and Emails count must match!";
+        msgDiv.className = "text-red-600 mt-2 font-medium";
+        return;
+      }
+
+      const payload = names.map((name, idx) => ({
+        name,
+        official_email: emails[idx],
+        branch: branches[idx] || null,
+        office_number: officeNumbers[idx] || null,
+        department: departments[idx] || null
+      }));
+
       try {
-        // ✅ Parse textarea as JSON array
-        const users = JSON.parse(input.value);
-
-        if (!Array.isArray(users)) {
-          result.textContent = "Input must be an array of users.";
-          return;
-        }
-
-        // ✅ Call backend bulk API
-        const res = await fetch(`${API_BASE}/users/bulk`, {
+        const token = localStorage.getItem("token");
+        const res = await fetch("/users/bulk", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("token")}` // ✅ Auth required
+            "Authorization": `Bearer ${token}`
           },
-          body: JSON.stringify({ users })
+          body: JSON.stringify({ users: payload })
         });
 
+        const data = await res.json().catch(() => ({}));
+
         if (!res.ok) {
-          const error = await res.json().catch(() => ({}));
-          throw new Error(error.error || "Failed to add users");
+          msgDiv.textContent = data.error || "Failed to add users";
+          msgDiv.className = "text-red-600 mt-2 font-medium";
+          return;
         }
 
-        const data = await res.json();
-        result.textContent = `✅ Added ${data.insertedCount} users (by ${data.handled_by_admin})`;
+        msgDiv.textContent = `${data.insertedCount} user(s) added successfully! Handled by: ${data.handled_by_admin}`;
+        msgDiv.className = "text-green-600 mt-2 font-medium";
 
-        // Refresh UsersComponent after bulk insert
-        if (window.UsersComponent) {
-          UsersComponent.load();
-        }
+        document.getElementById("addUserForm").reset();
+
+        // Refresh UsersComponent table (if exists)
+        if (typeof UsersComponent !== "undefined") UsersComponent.fetchUsers();
+
       } catch (err) {
         console.error("Add users failed:", err);
-        result.textContent = `❌ Add users failed: ${err.message}`;
+        msgDiv.textContent = "Server error while adding users";
+        msgDiv.className = "text-red-600 mt-2 font-medium";
       }
-    });
-  }
-
-  // ---------------- Public API ----------------
-  return {
-    render,
-    bindEvents
+    }
   };
 })();
+
+
 
     
 

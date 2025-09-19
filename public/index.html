@@ -406,11 +406,16 @@ const UsersComponent = (() => {
   let filterActive = true;
   let filterDept = "";
 
+  const API_BASE = "http://localhost:4000"; // full URL for backend
+
   // ---------------- Render HTML ----------------
-  function render() {
+  function render(targetId = "usersSection") {
+    const container = document.getElementById(targetId);
+    if (!container) return;
+
     const totalPages = Math.ceil(total / limit) || 1;
 
-    return `
+    container.innerHTML = `
       <div class="p-4">
         <h2 class="text-2xl font-bold mb-6 text-black">Users</h2>
 
@@ -485,35 +490,29 @@ const UsersComponent = (() => {
 
         <!-- Pagination -->
         <div class="flex justify-between items-center mt-6">
-          <button 
-            id="prevPageBtn" 
-            class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 ${page === 1 ? "opacity-50 cursor-not-allowed" : ""}"
-            ${page === 1 ? "disabled" : ""}
-          >Prev</button>
-          <span class="text-gray-700">Page ${page} of ${Math.ceil(total / limit) || 1}</span>
-          <button 
-            id="nextPageBtn" 
-            class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 ${page >= Math.ceil(total / limit) ? "opacity-50 cursor-not-allowed" : ""}"
-            ${page >= Math.ceil(total / limit) ? "disabled" : ""}
-          >Next</button>
+          <button id="prevPageBtn" class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 ${page === 1 ? "opacity-50 cursor-not-allowed" : ""}" ${page === 1 ? "disabled" : ""}>Prev</button>
+          <span class="text-gray-700">Page ${page} of ${totalPages}</span>
+          <button id="nextPageBtn" class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 ${page >= totalPages ? "opacity-50 cursor-not-allowed" : ""}" ${page >= totalPages ? "disabled" : ""}>Next</button>
         </div>
       </div>
     `;
+    attachListeners(targetId);
   }
 
-  // ---------------- Fetch Users (GET /users) ----------------
-  const fetchUsers = async (targetId = "usersSection") => {
+  // ---------------- Fetch Users (GET) ----------------
+  async function fetchUsers(targetId = "usersSection") {
     const container = document.getElementById(targetId);
+    const token = localStorage.getItem("token");
+
     if (!container) return;
 
-    const token = localStorage.getItem("token");
     if (!token) {
       container.innerHTML = `<div class="p-4 text-center text-red-600 font-bold">Please login to view users.</div>`;
       return;
     }
 
     try {
-      const params = new URLSearchParams({
+      const query = new URLSearchParams({
         page,
         limit,
         search: search.trim(),
@@ -521,27 +520,29 @@ const UsersComponent = (() => {
         department: filterDept
       });
 
-      const res = await fetch(`/users?${params.toString()}`, {
+      const res = await fetch(`${API_BASE}/users?${query.toString()}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
 
-      if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch users");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || "Failed to fetch users");
+      }
 
       const data = await res.json();
-      users = data.users || [];
-      total = data.total || 0;
+      users = data?.users || [];
+      total = data?.total || 0;
 
-      container.innerHTML = render();
-      attachListeners(targetId);
+      render(targetId);
 
     } catch (err) {
       console.error("Error loading users:", err);
       container.innerHTML = `<p class="text-red-600">Error: ${err.message}</p>`;
     }
-  };
+  }
 
   // ---------------- Attach Event Listeners ----------------
-  const attachListeners = (targetId) => {
+  function attachListeners(targetId) {
     const container = document.getElementById(targetId);
     if (!container) return;
 
@@ -549,7 +550,6 @@ const UsersComponent = (() => {
     const searchBtn = container.querySelector("#searchBtn");
     const prevBtn = container.querySelector("#prevPageBtn");
     const nextBtn = container.querySelector("#nextPageBtn");
-
     const totalPages = Math.ceil(total / limit) || 1;
 
     // Search
@@ -591,10 +591,9 @@ const UsersComponent = (() => {
         fetchUsers(targetId);
       }
     });
-  };
+  }
 
-  // ---------------- Public API ----------------
-  return { load: fetchUsers, fetchUsers };
+  return { load: fetchUsers, fetchUsers, render };
 })();
 
 

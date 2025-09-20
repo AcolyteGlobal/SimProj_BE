@@ -11,54 +11,95 @@ const router = express.Router();
 // ✅ GET /users
 // Example call: /users?page=1&limit=50
 // Fetch all users with pagination + phone assignment details (if assigned)
-router.get('/', async (req, res) => {
-  // Parse pagination params (defaults: page 1, 10 results per page)
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
-  const offset = (page - 1) * limit;
 
-  // SQL: Fetch user details + latest active SIM assignment (if exists)
-  const query = `
-  SELECT 
-    u.user_id, u.name, u.branch, u.department, u.office_number,
-    u.official_email, u.biometric_id, u.status,
-    u.created_at, u.updated_at,
-    u.handled_by_admin,        -- ✅ Include this
-    s.phone_number, sa.assigned_at
-  FROM users1 u
-  LEFT JOIN sim_assignment sa 
-    ON u.user_id = sa.user_id
-    AND sa.active = 1
-    AND sa.assigned_at = (
-      SELECT MAX(sa2.assigned_at)
-      FROM sim_assignment sa2
-      WHERE sa2.user_id = u.user_id AND sa2.active = 1
-    )
-  LEFT JOIN sim_inventory s 
-    ON sa.sim_id = s.sim_id
-  ORDER BY u.created_at DESC
-  LIMIT ? OFFSET ?;
-`;
-
-  // SQL: Count total users for pagination metadata
-  const countQuery = `SELECT COUNT(*) AS total FROM users1`;
-
+// ✅ GET /users
+// Returns paginated users with optional search, active filter, department filter
+// Includes latest assigned SIM (if any)
+router.get("/", async (req, res) => {
   try {
-    const [rows] = await pool.query(query, [limit, offset]);
-    const [countResult] = await pool.query(countQuery);
+    // --- Parse query params ---
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const search = (req.query.search || "").trim();
+    const active = req.query.active === "true";
+    let department = (req.query.department || "").trim().toLowerCase();
+
+    // Department alias example
+    if (department === "finance") department = "accounts";
+
+    // --- Base WHERE clause ---
+    let whereClauses = [];
+    let values = [];
+
+    if (active) whereClauses.push("status = 'active'");
+    if (department) {
+      whereClauses.push("LOWER(department) = ?");
+      values.push(department);
+    }
+    if (search) {
+      const like = `${search}%`; // prefix search
+      whereClauses.push("(" +
+        ["user_id","name","branch","office_number","department","biometric_id","official_email","status","handled_by_admin"]
+          .map(col => `${col} LIKE ?`).join(" OR ") +
+        ")");
+      for (let i = 0; i < 9; i++) values.push(like);
+    }
+
+    const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
+
+    // --- Main Query ---
+    const query = `
+      SELECT 
+        u.user_id,
+        u.name,
+        u.branch,
+        u.office_number,
+        u.department,
+        u.biometric_id,
+        u.official_email,
+        u.status,
+        u.created_at,
+        u.updated_at,
+        u.handled_by_admin,
+        s.phone_number
+      FROM (
+        SELECT * 
+        FROM users1
+        ${whereSQL}
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+      ) u
+      LEFT JOIN sim_assignment sa ON u.user_id = sa.user_id AND sa.active = 1
+      LEFT JOIN sim_inventory s ON sa.sim_id = s.sim_id
+    `;
+
+    // Push limit+offset
+    values.push(limit, offset);
+
+    const [users] = await pool.query(query, values);
+
+    // --- Count Query ---
+    let countSQL = `SELECT COUNT(*) AS total FROM users1 ${whereSQL}`;
+    const [countRows] = await pool.query(countSQL, values.slice(0, -2)); // exclude limit+offset
+    const total = countRows[0].total;
 
     res.json({
-      users: rows,                             // ✅ List of users
-      total: countResult[0].total,             // ✅ Total count of users
-      page,                                    // ✅ Current page
-      limit,                                   // ✅ Limit per page
-      totalPages: Math.ceil(countResult[0].total / limit), // ✅ Total pages
+      users,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
     });
   } catch (err) {
     console.error("Fetch users error:", err);
-    res.status(500).send("Server Error");
+    res.status(500).json({ error: "Server Error" });
   }
 });
+
+
+
 
 
 // ✅ GET /users/max-bio

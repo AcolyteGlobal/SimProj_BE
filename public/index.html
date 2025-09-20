@@ -491,8 +491,8 @@ const AddUserComponent = (() => {
       try {
         const token = localStorage.getItem("token");
 
-        // ✅ Explicit backend URL
-        const res = await fetch("http://localhost:4000/users", {
+        // ✅ backend /users
+        const res = await fetch("/users", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
